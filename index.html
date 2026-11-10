@@ -204,7 +204,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
         <li>The score is highest when the sun is dead ahead and under 15° up, where a visor cannot block it.</li>
         <li>Both directions of a two-way road are checked. One-way roads are checked in their direction only.</li>
         <li>Risk is the glare score raised near places where a driver must see clearly: 60% higher at traffic signals, 50% at junctions between main roads, 40% at crossings and schools. Small rings mark them when you zoom in.</li>
-        <li>A trip follows the quickest path on the loaded roads, and the sun moves as the trip goes on.</li>
+        <li>A typed trip uses a public route service (OSRM). A trip picked by tapping follows the quickest path on the loaded roads. Either way the sun moves as the trip goes on.</li>
         <li>Not included yet: hills, buildings and trees that block the sun, clouds, and wet-road reflection.</li>
         <li>Times are US Central. The sun position is calculated for the middle of the loaded roads.</li>
       </ul>
@@ -319,6 +319,17 @@ function tripCalc(path,segs,roads,departTs,lat,lng){
     t+=dur*60000});
   return {km:km,min:(t-departTs)/60000,gl:gl,hi:hi,st:st,lv:lv};
 }
+function lineCalc(line,departTs,dur){
+  var tot=0,i;for(i=0;i<line.length-1;i++)tot+=distKm(line[i][1],line[i][0],line[i+1][1],line[i+1][0]);
+  var kmh=dur>0&&tot>0?tot/(dur/3600):50,t=departTs,gl=0,hi=0,st=[],cur=null,lv=[];
+  for(i=0;i<line.length-1;i++){var a=line[i],b=line[i+1],km=distKm(a[1],a[0],b[1],b[0]);if(!km){lv.push(0);continue}
+    var d=km/kmh*60,sp=sunPos(t+d*30000,(a[1]+b[1])/2,(a[0]+b[0])/2),brg=bearing(a[1],a[0],b[1],b[0]),l=level(glareDir(brg,sp.az,sp.alt));lv.push(l);
+    if(l>=2){gl+=d;if(l===3)hi+=d;var dn=dirName(brg);
+      if(cur&&cur.d===dn&&Math.abs(t-cur.t1)<1000){cur.t1=t+d*60000;cur.km+=km;cur.l=Math.max(cur.l,l)}else{cur={name:'',d:dn,t0:t,t1:t+d*60000,km:km,l:l};st.push(cur)}}
+    else cur=null;
+    t+=d*60000}
+  return {km:tot,min:(t-departTs)/60000,gl:gl,hi:hi,st:st,lv:lv};
+}
 /*PURE-END*/
 
 var TZ='America/Chicago';
@@ -364,13 +375,15 @@ function zoned(y,m,d,min){var base=Date.UTC(y,m-1,d,0,min);var g=base-offMin(bas
 function hm(min){var h=Math.floor(min/60),m=min%60,ap=h<12?'am':'pm';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap}
 function dateParts(){var v=el('date').value.split('-');return [+v[0],+v[1],+v[2]]}
 
-function setRoads(list,hz,text){
+function setRoads(list,hz,text,keep){
   roads=list;hazards=hz||[];segs=makeSegs(list);var sl=0,sn=0;
   segs.forEach(function(s){s.ax=s.lo1;s.ay=my(s.la1);s.bx=s.lo2;s.by=my(s.la2);sl+=s.la1+s.la2;sn+=s.lo1+s.lo2});
   if(segs.length){center={lat:sl/segs.length/2,lng:sn/segs.length/2}}
-  applyWeights(segs,hazards);graph=buildGraph(segs,roads);trip={a:-1,b:-1,path:null};
-  srcText=text;el('src').textContent=text;selected=-1;showSel();fit();buildDay();update();
+  applyWeights(segs,hazards);graph=buildGraph(segs,roads);trip=(keep&&trip.line)?{a:-1,b:-1,path:null,line:trip.line,dur:trip.dur,A:trip.A,B:trip.B}:{a:-1,b:-1,path:null};
+  srcText=text;el('src').textContent=text;selected=-1;showSel();if(trip.line)fitLine();else fit();buildDay();update();
 }
+function fitLine(){var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;trip.line.forEach(function(c){var y=my(c[1]);x0=Math.min(x0,c[0]);x1=Math.max(x1,c[0]);y0=Math.min(y0,y);y1=Math.max(y1,y)});
+  view.cx=(x0+x1)/2;view.cy=(y0+y1)/2;view.k=Math.min(W/Math.max(x1-x0,1e-6),H/Math.max(y1-y0,1e-6))*0.8}
 function fit(){
   if(!segs.length)return;var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   segs.forEach(function(s){x0=Math.min(x0,s.ax,s.bx);x1=Math.max(x1,s.ax,s.bx);y0=Math.min(y0,s.ay,s.by);y1=Math.max(y1,s.ay,s.by)});
@@ -444,8 +457,11 @@ function draw(){
     for(var i=0;i<segs.length;i++){var s=segs[i];if(s.l!==l)continue;var x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by);
       if((x1<0&&x2<0)||(x1>W&&x2>W)||(y1<0&&y2<0)||(y1>H&&y2>H))continue;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)}
     ctx.strokeStyle=cols[l];
-    if(l>=2){ctx.lineWidth=wd[l]*2.8;ctx.globalAlpha=trip.path?0.08:0.2;ctx.stroke()}
-    ctx.lineWidth=wd[l];ctx.globalAlpha=(trip.path&&l>=2)?0.35:1;ctx.stroke();ctx.globalAlpha=1}
+    if(l>=2){ctx.lineWidth=wd[l]*2.8;ctx.globalAlpha=(trip.path||trip.line)?0.08:0.2;ctx.stroke()}
+    ctx.lineWidth=wd[l];ctx.globalAlpha=((trip.path||trip.line)&&l>=2)?0.35:1;ctx.stroke();ctx.globalAlpha=1}
+  if(trip.line&&trip.lv){var lc=[css('--surface'),css('--accent'),css('--med'),css('--high')],lw=[8,4,4.5,5];
+    for(var q3=0;q3<4;q3++){ctx.beginPath();for(var k3=0;k3<trip.line.length-1;k3++){var lv3=trip.lv[k3]||0,g3=lv3===3?3:lv3===2?2:1;if(q3!==0&&g3!==q3)continue;var a3=trip.line[k3],b3=trip.line[k3+1];ctx.moveTo(sx(a3[0]),sy(my(a3[1])));ctx.lineTo(sx(b3[0]),sy(my(b3[1])))}
+      ctx.strokeStyle=lc[q3];ctx.lineWidth=lw[q3];ctx.stroke()}}
   if(trip.path&&trip.lv){var tc=[css('--surface'),css('--accent'),css('--med'),css('--high')],tw=[8,4,4.5,5];
     for(var q2=0;q2<4;q2++){ctx.beginPath();trip.path.forEach(function(p,k){var lvk=trip.lv[k]||0,grp=lvk===3?3:lvk===2?2:1;if(q2!==0&&grp!==q2)return;var s=segs[p.i];ctx.moveTo(sx(s.ax),sy(s.ay));ctx.lineTo(sx(s.bx),sy(s.by))});
       ctx.strokeStyle=tc[q2];ctx.lineWidth=tw[q2];ctx.stroke()}}
@@ -458,7 +474,7 @@ function draw(){
   roads.forEach(function(r){if(!r.label)return;var p=r.pts[Math.floor(r.pts.length/2)],x=sx(p[1]),y=sy(my(p[0]));if(x<30||x>W-30||y<12||y>H-12)return;
     var w=ctx.measureText(r.name).width+8;
     for(var k=0;k<placed.length;k++){if(Math.abs(placed[k][0]-x)<(placed[k][2]+w)/2+4&&Math.abs(placed[k][1]-y)<22)return}placed.push([x,y,w]);ctx.fillStyle=bg;ctx.globalAlpha=0.8;ctx.fillRect(x-w/2,y-9,w,18);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText(r.name,x,y)});
-  [['A',trip.a],['B',trip.b]].forEach(function(m){if(m[1]<0||!graph)return;var x=sx(graph.nlng[m[1]]),y=sy(my(graph.nlat[m[1]]));
+  [['A',trip.a,trip.A],['B',trip.b,trip.B]].forEach(function(m){var x,y;if(trip.line&&m[2]){x=sx(m[2].lng);y=sy(my(m[2].lat))}else if(m[1]>=0&&graph){x=sx(graph.nlng[m[1]]);y=sy(my(graph.nlat[m[1]]))}else return;
     ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fillStyle=css('--accent');ctx.fill();ctx.strokeStyle=css('--surface');ctx.lineWidth=2;ctx.stroke();
     ctx.fillStyle=css('--surface');ctx.font='600 13px Barlow, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
   var cx=46,cy=46,R=30;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fillStyle=css('--surface');ctx.fill();ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.stroke();
@@ -474,21 +490,22 @@ function nearestNode(x,y){var best=-1,bd=Infinity;for(var i=0;i<graph.nlat.lengt
 function setPick(m){pickMode=m;el('btnA').classList.toggle('on',m==='a');el('btnB').classList.toggle('on',m==='b');
   el('tripHint').textContent=m?'Now tap the map where the trip '+(m==='a'?'starts':'ends')+'.':'Or pick on the map: tap Start, then tap the map. Do the same for End.';
   if(m)document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})}
-function solveTrip(){trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==trip.b)?shortest(graph,trip.a,trip.b):null;showTrip();draw()}
+function solveTrip(){trip.line=null;trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==trip.b)?shortest(graph,trip.a,trip.b):null;showTrip();draw()}
 function showTrip(){
   var o=el('tripOut');
-  el('btnA').textContent=trip.a>=0?'Start (A) set':'Start (A)';el('btnB').textContent=trip.b>=0?'End (B) set':'End (B)';
-  if(trip.a<0||trip.b<0){o.innerHTML='';return}
-  if(!trip.path){o.innerHTML='<p class="small">No path joins A and B on the loaded roads. Move one of them onto a connected road.</p>';return}
-  var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=tripCalc(trip.path,segs,roads,dep,center.lat,center.lng);trip.lv=r.lv;
-  var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:tripCalc(trip.path,segs,roads,zoned(p[0],p[1],p[2],m),center.lat,center.lng).gl}}).filter(Boolean);
+  el('btnA').textContent=(trip.a>=0||trip.line)?'Start (A) set':'Start (A)';el('btnB').textContent=(trip.b>=0||trip.line)?'End (B) set':'End (B)';
+  if(!trip.line&&(trip.a<0||trip.b<0)){o.innerHTML='';return}
+  var calc=function(ts){return trip.line?lineCalc(trip.line,ts,trip.dur):tripCalc(trip.path,segs,roads,ts,center.lat,center.lng)};
+  if(!trip.line&&!trip.path){o.innerHTML='<p class="small">No path joins A and B on the loaded roads. Move one of them onto a connected road.</p>';return}
+  var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=calc(dep);trip.lv=r.lv;
+  var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:calc(zoned(p[0],p[1],p[2],m)).gl}}).filter(Boolean);
   var best=res.reduce(function(x,y){return y.gl<x.gl?y:x});
   var h='<p class="big">'+(r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes')+'</p>';
   h+='<p class="small" style="margin-top:2px">'+r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep)+'.</p>';
   h+='<p class="small" style="margin-top:6px">Your trip is the thick line on the map: blue where it is fine, red or orange where the sun is in your eyes. Faded red roads are for people driving the other way.</p>';
   if(best.gl<r.gl-1)h+='<button type="button" class="primary" data-m="'+best.m+'" style="margin-top:10px;width:100%">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
   h+='<details><summary>Other leaving times and where it happens</summary><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+': '+Math.round(x.gl)+' min</button>'}).join('')+'</div>';
-  if(r.st.length)h+='<ul class="list">'+r.st.map(function(s){return '<li><span>'+(s.name||'Unnamed road')+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul>';
+  if(r.st.length)h+='<ul class="list">'+r.st.slice(0,8).map(function(s){return '<li><span>'+(s.name||(trip.line?'Your route':'Unnamed road'))+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul>';
   h+='</details>';
   o.innerHTML=h;
 }
@@ -538,12 +555,13 @@ el('file').addEventListener('change',function(){var f=el('file').files[0];if(!f)
   rd.readAsText(f)});
 el('btnReset').onclick=function(){setRoads(BN.roads,BN.hazards,BUILT);demoTrip();say('')};
 var EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
-function liveLoad(s,w,n,e){
+function liveLoad(s,w,n,e,light){
   var span=Math.max(e-w,n-s);
   var cls=span>0.3?'motorway|trunk|primary|secondary':span>0.08?'motorway|trunk|primary|secondary|tertiary':'motorway|trunk|primary|secondary|tertiary|unclassified|residential';
   var bb='('+s.toFixed(4)+','+w.toFixed(4)+','+n.toFixed(4)+','+e.toFixed(4)+')';
-  var pts=span>0.3?'':span>0.08?'node[highway=traffic_signals]'+bb+';':'node[highway~"^(traffic_signals|crossing)$"]'+bb+';';
-  var q='[out:json][timeout:60];(way[highway~"^('+cls+')$"]'+bb+';'+pts+');out geom;'+(span>0.08?'':'nwr[amenity=school]'+bb+';out center;');
+  if(light)cls=span>0.15?'motorway|trunk|primary':'motorway|trunk|primary|secondary';
+  var pts=(light||span>0.3)?'':span>0.08?'node[highway=traffic_signals]'+bb+';':'node[highway~"^(traffic_signals|crossing)$"]'+bb+';';
+  var q='[out:json][timeout:60];(way[highway~"^('+cls+')$"]'+bb+';'+pts+');out geom;'+((light||span>0.08)?'':'nwr[amenity=school]'+bb+';out center;');
   function attempt(i,last){if(i>=EP.length)return Promise.reject(last||new Error('no server'));
     return fetch(EP[i]+'?data='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('the map server answered '+r.status);return r.json()}).catch(function(err){return attempt(i+1,err)})}
   return attempt(0).then(function(j){var d=fromOverpass(j);d.span=span;return d});
@@ -569,12 +587,21 @@ el('tripForm').addEventListener('submit',function(ev){
   ev.preventDefault();var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
   if(!f||!t){hint('Type both a From address and a To address.');return}
   hint('Finding the two addresses…');el('btnGo').disabled=true;var A,B;
-  geocode(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocode(t)}).then(function(b){B=b;
+  geocode(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocode(t)}).then(function(b){B=b;hint('Finding the route…');
+    return fetch('https://router.project-osrm.org/route/v1/driving/'+A.lng+','+A.lat+';'+B.lng+','+B.lat+'?overview=full&geometries=geojson').then(function(r){if(!r.ok)throw new Error('route');return r.json()})
+     .then(function(j){var r=j.routes&&j.routes[0];if(!r||!r.geometry)throw new Error('route');return r},function(){return null})})
+   .then(function(r){
     var s=Math.min(A.lat,B.lat),n=Math.max(A.lat,B.lat),w=Math.min(A.lng,B.lng),e=Math.max(A.lng,B.lng),my_=Math.max(0.01,(n-s)*0.2),mx_=Math.max(0.013,(e-w)*0.2);
-    hint('Loading the roads between them…');
-    return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(err){say('Real roads could not be loaded, so the trip uses the roads already on the map. '+liveWhy(err))})})
-   .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to change when you leave.':'The two addresses were found, but no road path joins them on this map.');
-     document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})})
+    if(r){ // quick path: show the answer now, bring in the surrounding roads afterwards
+      trip={a:-1,b:-1,path:null,line:r.geometry.coordinates,dur:r.duration,A:A,B:B};setPick(null);fitLine();update();
+      hint('Trip found. Drag the time to change when you leave.');document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'});
+      say('Loading the map around your trip…');
+      liveLoad(s-my_,w-mx_,n+my_,e+mx_,true).then(function(d){if(d.roads.length&&trip.line){setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real main roads from OpenStreetMap around your trip.',true);say('')}},function(err){say('Your trip is right, but the roads around it could not be loaded. '+liveWhy(err))});
+      return}
+    hint('Loading the roads between them…'); // fallback: no route service, so find the path on downloaded roads
+    return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(err){say('Real roads could not be loaded, so the trip uses the roads already on the map. '+liveWhy(err))})
+     .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to change when you leave.':'The two addresses were found, but no road path joins them on this map.');
+       document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})})})
    .catch(function(err){var m=String(err&&err.message||'');
      hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':(/claude/i.test(location.hostname)?'Address lookup is blocked inside Claude. Open the page from its own web link in a browser, or pick the points on the map.':'Address lookup did not work. Wait a minute and try again, or pick the points on the map.'))})
    .then(function(){el('btnGo').disabled=false});
@@ -584,7 +611,7 @@ function near(la,lo){var b=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){v
 function demoTrip(){trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
 el('btnA').onclick=function(){setPick(pickMode==='a'?null:'a')};
 el('btnB').onclick=function(){setPick(pickMode==='b'?null:'b')};
-el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null};setPick(null);el('btnA').textContent='Start (A)';el('btnB').textContent='End (B)';showTrip();draw()};
+el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null,line:null};setPick(null);el('btnA').textContent='Start (A)';el('btnB').textContent='End (B)';showTrip();draw()};
 el('tripOut').addEventListener('click',function(e){var b=e.target.closest('button[data-m]');if(b)setTime(+b.getAttribute('data-m'))});
 el('date').value=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 window.addEventListener('resize',resize);
