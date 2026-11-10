@@ -48,7 +48,7 @@ p{margin:0}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
 .zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
 .zoom button{width:44px;height:44px;padding:0;font-size:24px;line-height:1;background:var(--surface)}
-.legend{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--muted);padding:0 4px}
 .key{display:inline-flex;align-items:center;gap:8px}
 .sw{display:inline-block;width:28px;border-radius:4px}
 #selCard{position:absolute;left:10px;right:10px;bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 44px 12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
@@ -107,7 +107,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 12</span></h1>
+  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 13</span></h1>
   <div class="verdict" id="verdict" aria-live="polite">
     <svg id="vIcon" viewBox="0 0 48 48" aria-hidden="true"></svg>
     <div><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
@@ -118,17 +118,18 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
       <button id="zin" type="button" aria-label="Zoom in">+</button>
       <button id="zout" type="button" aria-label="Zoom out">−</button>
     </div>
-    <div class="legend" id="legend">
-      <span class="key"><span class="sw" style="height:4px;background:var(--high)"></span>Sun in your eyes</span>
-      <span class="key"><span class="sw" style="height:3px;background:var(--med)"></span>A little sun</span>
-      <span class="key" id="keyFine"><span class="sw" style="height:2px;background:var(--road)"></span>Fine</span>
-    </div>
     <div id="attr" hidden>© OpenStreetMap</div>
     <div id="selCard" hidden>
       <button id="selClose" type="button" aria-label="Close">×</button>
       <div class="small" id="selTitle"></div>
       <div id="selBody"></div>
     </div>
+  </div>
+  <div class="legend" id="legend">
+    <span class="key"><span class="sw" style="height:4px;background:var(--high)"></span>Sun in your eyes</span>
+    <span class="key"><span class="sw" style="height:3px;background:var(--med)"></span>A little sun</span>
+    <span class="key">North is up</span>
+    <span class="key" id="keyFine"><span class="sw" style="height:2px;background:var(--road)"></span>Fine</span>
   </div>
   <div class="timebar">
     <div class="timetop">
@@ -386,7 +387,7 @@ function setRoads(list,hz,text,keep){
   srcText=text;el('src').textContent=text;selected=-1;showSel();if(trip.line)fitLine();else fit();buildDay();update();
 }
 function fitLine(){var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;trip.line.forEach(function(c){var y=my(c[1]);x0=Math.min(x0,c[0]);x1=Math.max(x1,c[0]);y0=Math.min(y0,y);y1=Math.max(y1,y)});
-  view.cx=(x0+x1)/2;view.cy=(y0+y1)/2;view.k=Math.min(W/Math.max(x1-x0,1e-6),H/Math.max(y1-y0,1e-6))*0.8}
+  view.cx=(x0+x1)/2;view.cy=(y0+y1)/2;view.k=Math.min(W/Math.max(x1-x0,1e-6),H/Math.max(y1-y0,1e-6))*0.66}
 function fit(){
   if(!segs.length)return;var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
   segs.forEach(function(s){x0=Math.min(x0,s.ax,s.bx);x1=Math.max(x1,s.ax,s.bx);y0=Math.min(y0,s.ay,s.by);y1=Math.max(y1,s.ay,s.by)});
@@ -439,8 +440,8 @@ function drawSky(min){
 }
 function showSel(){
   var card=el('selCard');
-  if(selected<0||!segs[selected]){card.hidden=true;el('legend').hidden=false;return}
-  card.hidden=false;el('legend').hidden=true;
+  if(selected<0||!segs[selected]){card.hidden=true;return}
+  card.hidden=false;
   var s=segs[selected],r=roads[s.r];
   el('selTitle').textContent=r.name||'This road';
   var wins=[],cur=null;
@@ -498,12 +499,15 @@ function draw(){
   [['A',trip.a,trip.A],['B',trip.b,trip.B]].forEach(function(m){var x,y;if(trip.line&&m[2]){x=sx(m[2].lng);y=sy(my(m[2].lat))}else if(m[1]>=0&&graph){x=sx(graph.nlng[m[1]]);y=sy(my(graph.nlat[m[1]]))}else return;
     ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fillStyle=css('--accent');ctx.fill();ctx.strokeStyle=css('--surface');ctx.lineWidth=2;ctx.stroke();
     ctx.fillStyle=css('--surface');ctx.font='600 13px Barlow, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
-  var cx=46,cy=46,R=30;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fillStyle=css('--surface');ctx.fill();ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.stroke();
-  ctx.fillStyle=css('--muted');ctx.font='600 11px Barlow, Arial, sans-serif';ctx.fillText('N',cx,cy-R+9);
-  if(sun.alt>-0.83){var a=sun.az*RAD,rr=R*(1-Math.min(Math.max(sun.alt,0),90)/90)*0.82;var px=cx+Math.sin(a)*rr,py=cy-Math.cos(a)*rr;
-    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.strokeStyle=css('--low');ctx.lineWidth=2;ctx.stroke();
-    ctx.beginPath();ctx.arc(px,py,5.5,0,7);ctx.fillStyle=css('--low');ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=1;ctx.stroke()}
-  else{ctx.fillStyle=css('--muted');ctx.font='500 10px Barlow, Arial, sans-serif';ctx.fillText('sun down',cx,cy+3)}
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.beginPath();ctx.arc(26,30,17,0,7);ctx.fillStyle=css('--surface');ctx.globalAlpha=0.92;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=ink;ctx.beginPath();ctx.moveTo(26,17);ctx.lineTo(31,26);ctx.lineTo(21,26);ctx.closePath();ctx.fill();
+  ctx.font='600 12px Barlow, Arial, sans-serif';ctx.fillText('N',26,36);
+  if(sun.alt>-0.83){var a=sun.az*RAD,R=Math.max(60,Math.min(W,H)/2-46),px=W/2+Math.sin(a)*R,py=H/2-Math.cos(a)*R;
+    ctx.strokeStyle=css('--low');ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();
+    for(var ry=0;ry<8;ry++){var an=ry*Math.PI/4;ctx.moveTo(px+Math.cos(an)*15,py+Math.sin(an)*15);ctx.lineTo(px+Math.cos(an)*20,py+Math.sin(an)*20)}ctx.stroke();
+    ctx.beginPath();ctx.arc(px,py,11,0,7);ctx.fillStyle=css('--low');ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.stroke();
+    var tw2=ctx.measureText('Sun').width+8;ctx.fillStyle=css('--surface');ctx.globalAlpha=0.85;ctx.fillRect(px-tw2/2,py+23,tw2,16);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText('Sun',px,py+31)}
 }
 function resize(){var r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;var first=!W;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);if(first)fit();draw()}
 function zoomAt(f,x,y){var mx=(x-W/2)/view.k+view.cx,myy=(y-H/2)/view.k+view.cy;view.k*=f;view.cx=mx-(x-W/2)/view.k;view.cy=myy-(y-H/2)/view.k;draw()}
@@ -523,6 +527,7 @@ function showTrip(){
   var best=res.reduce(function(x,y){return y.gl<x.gl?y:x});
   var h='<p class="big">'+(r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes')+'</p>';
   h+='<p class="small" style="margin-top:2px">'+r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep)+'.</p>';
+  if(trip.line&&trip.A&&trip.A.name)h+='<p class="small" style="margin-top:6px">A: '+esc(trip.A.name)+'<br>B: '+esc(trip.B.name)+'<br>If either is the wrong place, add more detail to the address, such as the ZIP code.</p>';
   h+='<p class="small" style="margin-top:6px">Your trip is the thick line on the map: blue where it is fine, red or orange where the sun is in your eyes. Faded red roads are for people driving the other way.</p>';
   if(best.gl<r.gl-1)h+='<button type="button" class="primary" data-m="'+best.m+'" style="margin-top:10px;width:100%">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
   h+='<details><summary>Other leaving times and where it happens</summary><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+': '+Math.round(x.gl)+' min</button>'}).join('')+'</div>';
@@ -605,17 +610,17 @@ el('btnLive').onclick=function(){
    .catch(function(err){say(liveWhy(err))});
 };
 function geocodeSlow(q){
-  var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
-  var url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)+'&viewbox='+[w,inv(view.cy-H/2/view.k),e,inv(view.cy+H/2/view.k)].map(function(v){return v.toFixed(3)}).join(',');
-  return fetch(url).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()}).then(function(j){if(!j.length)throw new Error('notfound:'+q);return {lat:+j[0].lat,lng:+j[0].lon}});
+  var url='https://nominatim.openstreetmap.org/search?format=json&limit=1&countrycodes=us&q='+encodeURIComponent(q)+'&viewbox='+[center.lng-0.6,center.lat+0.6,center.lng+0.6,center.lat-0.6].map(function(v){return v.toFixed(3)}).join(',');
+  return fetch(url).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()}).then(function(j){if(!j.length)throw new Error('notfound:'+q);return {lat:+j[0].lat,lng:+j[0].lon,name:String(j[0].display_name||q).split(',').slice(0,4).join(',')}});
 }
 function geocodeFast(q){
   return fetch('https://photon.komoot.io/api/?limit=1&lat='+center.lat.toFixed(3)+'&lon='+center.lng.toFixed(3)+'&q='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()})
-   .then(function(j){var f=j.features&&j.features[0];if(!f||!f.geometry)throw new Error('notfound:'+q);return {lat:+f.geometry.coordinates[1],lng:+f.geometry.coordinates[0]}});
+   .then(function(j){var f=j.features&&j.features[0];if(!f||!f.geometry)throw new Error('notfound:'+q);var p=f.properties||{};
+     return {lat:+f.geometry.coordinates[1],lng:+f.geometry.coordinates[0],name:[p.housenumber,p.street||p.name,p.city,p.state].filter(Boolean).join(' ')||q}});
 }
 function geocodeBoth(f,t){
-  return Promise.all([geocodeFast(f),geocodeFast(t)]).catch(function(){
-    var A;return geocodeSlow(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocodeSlow(t)}).then(function(b){return [A,b]})});
+  var A;return geocodeSlow(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocodeSlow(t)}).then(function(b){return [A,b]})
+   .catch(function(err){return Promise.all([geocodeFast(f),geocodeFast(t)]).catch(function(){throw err})});
 }
 function wait(ms){return new Promise(function(ok){setTimeout(ok,ms)})}
 function hint(t){el('tripHint').textContent=t}
