@@ -52,7 +52,8 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .key{display:inline-flex;align-items:center;gap:8px}
 .sw{display:inline-block;width:28px;border-radius:4px}
 #selCard{position:absolute;left:10px;right:10px;bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 44px 12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
-#selCard[hidden],.legend[hidden]{display:none}
+#selCard[hidden],.legend[hidden],.key[hidden],#attr[hidden]{display:none}
+#attr{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:4px}
 #selClose{position:absolute;right:6px;top:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:22px;color:var(--muted)}
 .big{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.15;text-wrap:balance}
 .timebar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px 12px}
@@ -64,7 +65,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 #sky .hot{fill:none;stroke:var(--med);stroke-width:6;stroke-linecap:round}
 #sky .sun{fill:var(--low);stroke:var(--ink);stroke-width:1.5}
 #sky text{fill:var(--muted);font:500 12px var(--body)}
-input[type=range]{width:100%;accent-color:var(--accent);height:36px;margin:0}
+input[type=range]{width:100%;accent-color:var(--accent);height:36px;margin:0;touch-action:pan-y}
 .row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .three{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:6px}
 button,.filebtn{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 12px;cursor:pointer;min-height:48px}
@@ -106,7 +107,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 9</span></h1>
+  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 12</span></h1>
   <div class="verdict" id="verdict" aria-live="polite">
     <svg id="vIcon" viewBox="0 0 48 48" aria-hidden="true"></svg>
     <div><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
@@ -120,8 +121,9 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
     <div class="legend" id="legend">
       <span class="key"><span class="sw" style="height:4px;background:var(--high)"></span>Sun in your eyes</span>
       <span class="key"><span class="sw" style="height:3px;background:var(--med)"></span>A little sun</span>
-      <span class="key"><span class="sw" style="height:2px;background:var(--road)"></span>Fine</span>
+      <span class="key" id="keyFine"><span class="sw" style="height:2px;background:var(--road)"></span>Fine</span>
     </div>
+    <div id="attr" hidden>© OpenStreetMap</div>
     <div id="selCard" hidden>
       <button id="selClose" type="button" aria-label="Close">×</button>
       <div class="small" id="selTitle"></div>
@@ -450,11 +452,24 @@ function showSel(){
 }
 function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
 function sx(x){return (x-view.cx)*view.k+W/2} function sy(y){return (y-view.cy)*view.k+H/2}
+var tiles={on:false,cache:new Map()};
+function tileImg(z,x,y){var k=z+'/'+x+'/'+y,t=tiles.cache.get(k);if(t)return t;
+  var im=new Image();t={im:im,ok:false};im.onload=function(){t.ok=true;if(!tiles.on){tiles.on=true;el('attr').hidden=false;el('keyFine').hidden=true}draw()};
+  im.src='https://tile.openstreetmap.org/'+k+'.png';tiles.cache.set(k,t);
+  if(tiles.cache.size>300)tiles.cache.delete(tiles.cache.keys().next().value);return t}
+function drawTiles(){
+  var z=Math.max(3,Math.min(19,Math.round(Math.log(view.k*360/256)/Math.LN2))),n=Math.pow(2,z),sz=360/n*view.k;
+  var x0=Math.floor((view.cx-W/2/view.k+180)/360*n),x1=Math.floor((view.cx+W/2/view.k+180)/360*n),y0=Math.floor((view.cy-H/2/view.k+180)/360*n),y1=Math.floor((view.cy+H/2/view.k+180)/360*n);
+  if((x1-x0+1)*(y1-y0+1)>48)return;
+  for(var x=x0;x<=x1;x++)for(var y=y0;y<=y1;y++){if(y<0||y>=n)continue;var t=tileImg(z,((x%n)+n)%n,y);
+    if(t.ok)ctx.drawImage(t.im,sx(x/n*360-180),sy(y/n*360-180),sz+0.6,sz+0.6)}
+}
 function draw(){
   ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=css('--mapbg');ctx.fillRect(0,0,W,H);
+  if(W&&view.k>1)drawTiles();
   ctx.lineCap='round';ctx.lineJoin='round';
   var cols=[css('--road'),css('--road'),css('--med'),css('--high')],wd=[roads.length>200?1:1.6,roads.length>200?1:1.6,2.6,3.4];
-  for(var l=0;l<4;l++){ctx.beginPath();
+  for(var l=0;l<4;l++){if(tiles.on&&l<2)continue;ctx.beginPath();
     for(var i=0;i<segs.length;i++){var s=segs[i];if(s.l!==l)continue;var x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by);
       if((x1<0&&x2<0)||(x1>W&&x2>W)||(y1<0&&y2<0)||(y1>H&&y2>H))continue;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)}
     ctx.strokeStyle=cols[l];
@@ -471,10 +486,15 @@ function draw(){
   for(var hI=0;hI<hazards.length&&vis.length<=40;hI++){var hx=sx(hazards[hI].lng),hy=sy(my(hazards[hI].lat));if(hx>0&&hx<W&&hy>0&&hy<H)vis.push([hx,hy])}
   if(vis.length<=40){ctx.lineWidth=1.5;ctx.strokeStyle=ink;ctx.fillStyle=bg;vis.forEach(function(v){ctx.beginPath();ctx.arc(v[0],v[1],3.5,0,7);ctx.fill();ctx.stroke()})}
   ctx.font='500 12px Barlow, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
-  var placed=[];
-  roads.forEach(function(r){if(!r.label)return;var p=r.pts[Math.floor(r.pts.length/2)],x=sx(p[1]),y=sy(my(p[0]));if(x<30||x>W-30||y<12||y>H-12)return;
-    var w=ctx.measureText(r.name).width+8;
-    for(var k=0;k<placed.length;k++){if(Math.abs(placed[k][0]-x)<(placed[k][2]+w)/2+4&&Math.abs(placed[k][1]-y)<22)return}placed.push([x,y,w]);ctx.fillStyle=bg;ctx.globalAlpha=0.8;ctx.fillRect(x-w/2,y-9,w,18);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText(r.name,x,y)});
+  if(!tiles.on){var placed=[],seenName={},minK=view.k>12000?0:view.k>3000?45:60,cand=[];
+  for(var ri=0;ri<roads.length;ri++){var r=roads[ri];if(!r.name||seenName[r.name])continue;if(!r.label&&(r.kmh||35)<minK)continue;
+    var p=r.pts[Math.floor(r.pts.length/2)],x=sx(p[1]),y=sy(my(p[0]));if(x<34||x>W-34||y<14||y>H-14)continue;
+    seenName[r.name]=1;cand.push([r.label?200:(r.kmh||35),x,y,r.name])}
+  cand.sort(function(m,n){return n[0]-m[0]});
+  for(var ci=0;ci<cand.length&&placed.length<28;ci++){var c=cand[ci],w=ctx.measureText(c[3]).width+8,hit=false;
+    for(var k=0;k<placed.length;k++){if(Math.abs(placed[k][0]-c[1])<(placed[k][2]+w)/2+6&&Math.abs(placed[k][1]-c[2])<22){hit=true;break}}
+    if(hit)continue;placed.push([c[1],c[2],w]);
+    ctx.fillStyle=bg;ctx.globalAlpha=0.82;ctx.fillRect(c[1]-w/2,c[2]-9,w,18);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText(c[3],c[1],c[2])}}
   [['A',trip.a,trip.A],['B',trip.b,trip.B]].forEach(function(m){var x,y;if(trip.line&&m[2]){x=sx(m[2].lng);y=sy(my(m[2].lat))}else if(m[1]>=0&&graph){x=sx(graph.nlng[m[1]]);y=sy(my(graph.nlat[m[1]]))}else return;
     ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fillStyle=css('--accent');ctx.fill();ctx.strokeStyle=css('--surface');ctx.lineWidth=2;ctx.stroke();
     ctx.fillStyle=css('--surface');ctx.font='600 13px Barlow, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
@@ -525,7 +545,14 @@ function up(e){if(!pts.has(e.pointerId))return;var p=pts.get(e.pointerId),one=pt
 cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',function(e){pts.delete(e.pointerId)});
 cv.addEventListener('wheel',function(e){e.preventDefault();var p=pos(e);zoomAt(e.deltaY<0?1.2:1/1.2,p.x,p.y)},{passive:false});
 el('zin').onclick=function(){zoomAt(1.4,W/2,H/2)};el('zout').onclick=function(){zoomAt(1/1.4,W/2,H/2)};
-el('time').addEventListener('input',update);
+var sl={v:0,x:0,y:0,mode:null,down:false},tEl=el('time');
+function slBack(){tEl.value=sl.v;update()}
+tEl.addEventListener('pointerdown',function(e){sl={v:+tEl.value,x:e.clientX,y:e.clientY,mode:null,down:true}});
+tEl.addEventListener('pointermove',function(e){if(!sl.down||sl.mode)return;var dx=Math.abs(e.clientX-sl.x),dy=Math.abs(e.clientY-sl.y);
+  if(Math.max(dx,dy)>6){sl.mode=dx>=dy?'drag':'scroll';if(sl.mode==='scroll')slBack()}});
+tEl.addEventListener('pointercancel',function(){if(sl.down&&sl.mode!=='drag')slBack();sl.down=false});
+tEl.addEventListener('pointerup',function(){sl.down=false});
+tEl.addEventListener('input',function(){if(sl.down&&sl.mode==='scroll'){tEl.value=sl.v}update()});
 el('date').addEventListener('change',function(){if(!el('date').value)return;buildDay();update()});
 function setTime(m){el('time').value=Math.max(0,Math.min(1435,Math.round(m/5)*5));update()}
 el('btnNow').onclick=function(){var o={};fmt.formatToParts(new Date()).forEach(function(p){o[p.type]=+p.value});el('date').value=o.year+'-'+(o.month<10?'0':'')+o.month+'-'+(o.day<10?'0':'')+o.day;buildDay();setTime(o.hour*60+o.minute)};
