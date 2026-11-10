@@ -199,9 +199,15 @@
     var span = Math.max(box[3] - box[1], box[2] - box[0]);
     var cls = span > 0.3 ? 'motorway|trunk|primary|secondary' : span > 0.08 ? 'motorway|trunk|primary|secondary|tertiary' : 'motorway|trunk|primary|secondary|tertiary|unclassified|residential';
     var bb = '(' + box.map(function (v) { return v.toFixed(4); }).join(',') + ')';
-    var q = '[out:json][timeout:40];(way[highway~"^(' + cls + ')$"]' + bb + ';node[highway~"^(traffic_signals|crossing)$"]' + bb + ';);out geom;nwr[amenity=school]' + bb + ';out center;';
-    var url = (options.endpoint || 'https://overpass-api.de/api/interpreter') + '?data=' + encodeURIComponent(q);
-    return fetch(url).then(function (r) { if (!r.ok) throw new Error('OpenStreetMap server answered ' + r.status); return r.json(); }).then(fromOverpass);
+    var pts = span > 0.3 ? '' : span > 0.08 ? 'node[highway=traffic_signals]' + bb + ';' : 'node[highway~"^(traffic_signals|crossing)$"]' + bb + ';';
+    var q = '[out:json][timeout:60];(way[highway~"^(' + cls + ')$"]' + bb + ';' + pts + ');out geom;' + (span > 0.08 ? '' : 'nwr[amenity=school]' + bb + ';out center;');
+    var servers = options.endpoint ? [options.endpoint] : ['https://overpass-api.de/api/interpreter', 'https://overpass.kumi.systems/api/interpreter'];
+    function attempt(i, last) {
+      if (i >= servers.length) return Promise.reject(last || new Error('No map server answered'));
+      return fetch(servers[i] + '?data=' + encodeURIComponent(q)).then(function (r) { if (!r.ok) throw new Error('OpenStreetMap server answered ' + r.status); return r.json(); })
+        .catch(function (err) { return attempt(i + 1, err); });
+    }
+    return attempt(0).then(fromOverpass);
   }
   function fromOverpass(json) {
     var roads = [], hazards = [];

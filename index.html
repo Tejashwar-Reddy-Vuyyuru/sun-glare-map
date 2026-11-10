@@ -532,20 +532,26 @@ el('file').addEventListener('change',function(){var f=el('file').files[0];if(!f)
     catch(err){say('That file could not be read as JSON. Export it again as GeoJSON or Overpass JSON.')}};
   rd.readAsText(f)});
 el('btnReset').onclick=function(){setRoads(BN.roads,BN.hazards,BUILT);demoTrip();say('')};
+var EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
 function liveLoad(s,w,n,e){
   var span=Math.max(e-w,n-s);
   var cls=span>0.3?'motorway|trunk|primary|secondary':span>0.08?'motorway|trunk|primary|secondary|tertiary':'motorway|trunk|primary|secondary|tertiary|unclassified|residential';
   var bb='('+s.toFixed(4)+','+w.toFixed(4)+','+n.toFixed(4)+','+e.toFixed(4)+')';
-  var q='[out:json][timeout:40];(way[highway~"^('+cls+')$"]'+bb+';node[highway~"^(traffic_signals|crossing)$"]'+bb+';);out geom;nwr[amenity=school]'+bb+';out center;';
-  return fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('busy');return r.json()}).then(function(j){var d=fromOverpass(j);d.span=span;return d});
+  var pts=span>0.3?'':span>0.08?'node[highway=traffic_signals]'+bb+';':'node[highway~"^(traffic_signals|crossing)$"]'+bb+';';
+  var q='[out:json][timeout:60];(way[highway~"^('+cls+')$"]'+bb+';'+pts+');out geom;'+(span>0.08?'':'nwr[amenity=school]'+bb+';out center;');
+  function attempt(i,last){if(i>=EP.length)return Promise.reject(last||new Error('no server'));
+    return fetch(EP[i]+'?data='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('the map server answered '+r.status);return r.json()}).catch(function(err){return attempt(i+1,err)})}
+  return attempt(0).then(function(j){var d=fromOverpass(j);d.span=span;return d});
 }
+function liveWhy(err){var m=String(err&&err.message||'');
+  return /claude/i.test(location.hostname)?'Live loading is blocked inside Claude. Open the page from its own web link in a browser.':'Live loading did not work'+(m.indexOf('answered')>=0?' ('+m+')':'')+'. The map server may be busy or the area too large. Zoom in to a smaller area and try again in a minute.'}
 el('btnLive').onclick=function(){
   var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
   var n=inv(view.cy-H/2/view.k),s=inv(view.cy+H/2/view.k);
   say('Loading roads from OpenStreetMap…');
   liveLoad(s,w,n,e).then(function(d){var list=d.roads;if(!list.length){say('No roads came back for this view. Zoom out a little and try again.');return}
      var keep={cx:view.cx,cy:view.cy,k:view.k};setRoads(list,d.hazards,'Showing '+list.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for the view you chose'+(d.span>0.08?' (main roads only; zoom in for side streets).':'.'));view=keep;draw();say('')})
-   .catch(function(){say('Live loading did not work. Claude pages block outside data, so open the downloaded file in a browser, or use Load a road file. If you are already in a browser, the map server may be busy; try again in a minute.')});
+   .catch(function(err){say(liveWhy(err))});
 };
 function geocode(q){
   var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
@@ -561,11 +567,11 @@ el('tripForm').addEventListener('submit',function(ev){
   geocode(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocode(t)}).then(function(b){B=b;
     var s=Math.min(A.lat,B.lat),n=Math.max(A.lat,B.lat),w=Math.min(A.lng,B.lng),e=Math.max(A.lng,B.lng),my_=Math.max(0.01,(n-s)*0.2),mx_=Math.max(0.013,(e-w)*0.2);
     hint('Loading the roads between them…');
-    return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(){say('Real roads could not be loaded, so the trip uses the roads already on the map.')})})
+    return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(err){say('Real roads could not be loaded, so the trip uses the roads already on the map. '+liveWhy(err))})})
    .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to change when you leave.':'The two addresses were found, but no road path joins them on this map.');
      document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})})
    .catch(function(err){var m=String(err&&err.message||'');
-     hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':'Address lookup did not work. It is blocked inside Claude, so open index.html in a browser, or pick the points on the map.')})
+     hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':(/claude/i.test(location.hostname)?'Address lookup is blocked inside Claude. Open the page from its own web link in a browser, or pick the points on the map.':'Address lookup did not work. Wait a minute and try again, or pick the points on the map.'))})
    .then(function(){el('btnGo').disabled=false});
 });
 var BUILT='Showing a built-in sketch of '+BUILTIN.length+' main St. Louis roads with '+BN.hazards.length+' junctions between them. Positions are approximate and drawn by hand, so use real roads for any real check.';
