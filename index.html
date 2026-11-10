@@ -5,112 +5,146 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>St. Louis Sun Glare Map</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  /* layout: first screen is verdict + map + time; everything else sits below, folded */
-  --bg:#f2f5f9; --surface:#ffffff; --ink:#152033; --muted:#566378; --line:#d3dae4;
-  --accent:#0a4fb3; --mapbg:#e4eaf1; --road:#9eabba;
-  --low:#f2b705; --med:#f07d12; --high:#d62828; --ok:#1e8a4c;
-  --display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
-  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+  /* layout: ask (from/to) -> answer (banner) -> map -> time; details folded below */
+  --bg:#f3f5f9; --surface:#ffffff; --ink:#0f1b2d; --muted:#5b6a80; --line:#e2e7ee;
+  --accent:#2457e6; --mapbg:#e6ebf2; --road:#9aa7b8;
+  --low:#f5b301; --med:#f07d12; --high:#dc2f2f; --ok:#16864a;
+  --shadow:0 1px 2px rgba(16,24,40,.06),0 8px 24px rgba(16,24,40,.07);
+  --display:"Manrope","Segoe UI",system-ui,sans-serif;
+  --body:"Manrope","Segoe UI",system-ui,sans-serif;
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme:dark;
-    --bg:#0e141c; --surface:#172130; --ink:#eaf0f7; --muted:#97a6ba; --line:#2a3748;
-    --accent:#74b0ff; --mapbg:#0a1017; --road:#465568;
-    --low:#f2c230; --med:#f58f35; --high:#ff5c54; --ok:#4fc07a;
+    --bg:#0c121b; --surface:#151e2c; --ink:#eaf0f8; --muted:#98a7bc; --line:#263243;
+    --accent:#7aa5ff; --mapbg:#0a1018; --road:#46566b;
+    --low:#f5c22e; --med:#f58f35; --high:#ff5f57; --ok:#55c585;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
   }
 }
 :root[data-theme="dark"]{
   color-scheme:dark;
-  --bg:#0e141c; --surface:#172130; --ink:#eaf0f7; --muted:#97a6ba; --line:#2a3748;
-  --accent:#74b0ff; --mapbg:#0a1017; --road:#465568;
-  --low:#f2c230; --med:#f58f35; --high:#ff5c54; --ok:#4fc07a;
+  --bg:#0c121b; --surface:#151e2c; --ink:#eaf0f8; --muted:#98a7bc; --line:#263243;
+  --accent:#7aa5ff; --mapbg:#0a1018; --road:#46566b;
+  --low:#f5c22e; --med:#f58f35; --high:#ff5f57; --ok:#55c585;
+  --shadow:0 1px 2px rgba(0,0,0,.4),0 8px 24px rgba(0,0,0,.35);
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.4;font-variant-numeric:tabular-nums}
-.screen{height:100%;min-height:560px;display:flex;flex-direction:column;gap:10px;padding:12px 16px;max-width:860px;margin:0 auto}
-.below{max-width:860px;margin:0 auto;padding:4px 16px 40px;display:flex;flex-direction:column;gap:14px}
-h1{font-family:var(--display);font-weight:600;font-size:17px;margin:0;color:var(--muted);letter-spacing:.01em}
-h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 6px;text-wrap:balance}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:16px;line-height:1.45;font-variant-numeric:tabular-nums}
+.screen,.below{max-width:720px;margin:0 auto;padding:14px 16px 0;display:flex;flex-direction:column;gap:12px}
+.below{padding-bottom:40px}
+h1{font-family:var(--display);font-weight:700;font-size:18px;margin:0;letter-spacing:-.01em}
+h1 span{font-weight:500;color:var(--muted);font-size:13px}
+h2{font-family:var(--display);font-weight:700;font-size:18px;margin:0 0 6px;text-wrap:balance}
 p{margin:0}
-.verdict{display:flex;align-items:center;gap:12px;border-radius:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--line)}
-.verdict svg{flex:none;width:44px;height:44px}
-.verdict .vm{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.1;text-wrap:balance}
-.verdict .vs{font-size:15px;opacity:.9}
-.verdict.v-high{background:var(--high);border-color:var(--high);color:#fff}
-.verdict.v-med{background:var(--med);border-color:var(--med);color:#241400}
+.card,.search,.sheet,details{background:var(--surface);border-radius:18px;box-shadow:var(--shadow)}
+button{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-height:44px;cursor:pointer;transition:transform .08s ease,background .15s ease,border-color .15s ease}
+button:active{transform:scale(.97)}
+button:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible,.filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.primary,button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+:root[data-theme="dark"] button.primary,:root[data-theme="dark"] button.on{color:#06101f}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]) button.primary,:root:not([data-theme="light"]) button.on{color:#06101f}}
+button[disabled]{opacity:.6}
+.icon{width:44px;height:44px;min-height:44px;padding:0;display:inline-flex;align-items:center;justify-content:center;border-radius:12px;flex:none}
+.icon svg{width:22px;height:22px}
+.search{display:grid;grid-template-columns:1fr auto;gap:8px 10px;padding:12px;align-items:center}
+.fields{display:flex;flex-direction:column;gap:8px;min-width:0}
+.field{display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:0 4px 0 10px}
+.field:focus-within{border-color:var(--accent)}
+.field input{flex:1;min-width:0;font:inherit;color:var(--ink);background:none;border:0;outline:0;padding:12px 0;min-height:46px}
+.field .icon{border:0;background:none;color:var(--muted);width:40px}
+.field .icon.on{color:#fff;background:var(--accent)}
+.dot{flex:none;width:24px;height:24px;border-radius:50%;background:var(--accent);color:#fff;font-size:12px;font-weight:700;display:inline-flex;align-items:center;justify-content:center}
+.dot.b{background:var(--ink);color:var(--surface)}
+.side{display:flex;flex-direction:column;gap:8px;align-self:stretch;justify-content:center}
+#btnGo{grid-column:1 / -1;font-size:17px;min-height:50px}
+.hint{font-size:14px;color:var(--muted);padding:0 4px;min-height:1.4em}
+.verdict{display:flex;align-items:center;gap:12px;border-radius:18px;padding:14px 16px;background:var(--surface);box-shadow:var(--shadow);transition:background .25s ease,color .25s ease}
+.verdict>svg{flex:none;width:40px;height:40px}
+.verdict .txt{flex:1;min-width:0}
+.verdict .vm{font-family:var(--display);font-weight:700;font-size:21px;line-height:1.15;letter-spacing:-.01em;text-wrap:balance}
+.verdict .vs{font-size:14px;opacity:.92;margin-top:2px}
+.verdict.v-high{background:var(--high);color:#fff}
+.verdict.v-med{background:var(--med);color:#241400}
 .verdict.v-ok .vm{color:var(--ok)}
-.mapwrap{position:relative;flex:1;min-height:260px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--mapbg)}
+.verdict #btnClear{background:rgba(127,127,127,.18);border:0;color:inherit;font-size:20px}
+.mapwrap{position:relative;height:46vh;min-height:300px;max-height:520px;border-radius:18px;overflow:hidden;background:var(--mapbg);box-shadow:var(--shadow)}
 canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
-.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
-.zoom button{width:44px;height:44px;padding:0;font-size:24px;line-height:1;background:var(--surface)}
-.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:14px;color:var(--muted);padding:0 4px}
+.zoom{position:absolute;right:12px;top:12px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:40px;height:40px;min-height:40px;padding:0;font-size:22px;line-height:1;background:var(--surface);border:0;box-shadow:var(--shadow)}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;color:var(--muted);padding:0 4px}
 .key{display:inline-flex;align-items:center;gap:8px}
-.sw{display:inline-block;width:28px;border-radius:4px}
-#selCard{position:absolute;left:10px;right:10px;bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 44px 12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
-#selCard[hidden],.legend[hidden],.key[hidden],#attr[hidden]{display:none}
-#attr{position:absolute;right:6px;bottom:4px;font-size:11px;color:#333;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:4px}
-#selClose{position:absolute;right:6px;top:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:22px;color:var(--muted)}
-.big{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.15;text-wrap:balance}
-.timebar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px 12px}
+.sw{display:inline-block;width:26px;border-radius:4px}
+#selCard{position:absolute;left:12px;right:12px;bottom:12px;background:var(--surface);border-radius:14px;padding:12px 44px 12px 14px;box-shadow:var(--shadow)}
+#selCard[hidden],.legend[hidden],.key[hidden],#attr[hidden],#btnClear[hidden]{display:none}
+#attr{position:absolute;right:8px;bottom:6px;font-size:11px;color:#333;background:rgba(255,255,255,.75);padding:1px 5px;border-radius:4px}
+#selClose{position:absolute;right:4px;top:4px;width:36px;height:36px;min-height:36px;padding:0;border:0;background:none;font-size:22px;color:var(--muted)}
+.big{font-family:var(--display);font-weight:700;font-size:18px;line-height:1.2;text-wrap:balance}
+.sheet{padding:14px 16px 16px}
 .timetop{display:flex;align-items:center;justify-content:space-between;gap:10px}
-.time{font-family:var(--display);font-weight:600;font-size:38px;line-height:1}
-#sky{width:100%;height:60px;display:block}
+.time{font-family:var(--display);font-weight:700;font-size:34px;line-height:1;letter-spacing:-.02em}
+#btnPlay{width:48px;height:48px;border-radius:50%;padding:0;font-size:18px}
+#sky{width:100%;height:58px;display:block;margin-top:4px}
 #sky .base{stroke:var(--line);stroke-width:2}
 #sky .arc{fill:none;stroke:var(--line);stroke-width:3}
 #sky .hot{fill:none;stroke:var(--med);stroke-width:6;stroke-linecap:round}
 #sky .sun{fill:var(--low);stroke:var(--ink);stroke-width:1.5}
 #sky text{fill:var(--muted);font:500 12px var(--body)}
 input[type=range]{width:100%;accent-color:var(--accent);height:36px;margin:0;touch-action:pan-y}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-.three{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:6px}
-button,.filebtn{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 12px;cursor:pointer;min-height:48px}
-button:hover,.filebtn:hover{border-color:var(--accent)}
-button:focus-visible,input:focus-visible,summary:focus-visible,.filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
-button.primary,button.on{background:var(--accent);border-color:var(--accent);color:var(--surface)}
-.three button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 6px;font-size:15px}
-.three svg{width:26px;height:26px}
-#btnPlay{width:56px;font-size:22px}
-.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
-.addr{display:flex;flex-direction:column;gap:6px}
-.addr input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:48px;width:100%}
-.addr button{margin-top:6px;font-size:18px;min-height:56px}
-.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
-.two button{font-size:18px;min-height:56px}
-.small{font-size:15px;color:var(--muted)}
-.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;color:#fff}
+.chipsrow{display:flex;gap:8px;margin-top:6px}
+.chipsrow button{flex:1;border-radius:999px;min-height:42px;padding:8px 10px;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:15px}
+.chipsrow svg{width:18px;height:18px}
+#tripOut:empty{display:none}
+#tripOut{display:flex;flex-direction:column;gap:10px}
+.wide{width:100%;min-height:50px;font-size:16px}
+.small{font-size:14px;color:var(--muted)}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:700;color:#fff}
 .pill.high{background:var(--high)} .pill.med{background:var(--med);color:#241400} .pill.low,.pill.none{background:var(--road)}
 ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
 ul.list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
 ul.list li:first-child{border-top:0}
-ul.list button{border:0;background:none;padding:0;min-height:0;text-align:left;color:var(--accent);font-weight:500}
-.cmp{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.cmp button{font-size:14px;padding:7px 10px;min-height:40px;font-weight:500}
-.cmp button.best{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
-details details,.card details{border:0;padding:8px 0 0;background:none}
-summary{cursor:pointer;font-weight:600}
+ul.list button{border:0;background:none;padding:0;min-height:0;text-align:left;color:var(--accent);font-weight:600}
+.cmp{display:flex;flex-wrap:wrap;gap:8px}
+.cmp button{font-size:14px;padding:6px 12px;min-height:38px;font-weight:600;border-radius:999px}
+.cmp button.best{border-color:var(--accent);color:var(--accent)}
+details{padding:14px 16px}
+details details,.card details{box-shadow:none;border-radius:0;padding:0;background:none}
+summary{cursor:pointer;font-weight:700}
 details>*+*{margin-top:12px}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;background:var(--bg)}
 input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
 .notes{margin:0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px;max-width:65ch}
-.filebtn{position:relative;display:inline-flex;align-items:center}
+.filebtn{position:relative;display:inline-flex;align-items:center;font-weight:600;background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:10px 14px;min-height:44px;cursor:pointer}
 .filebtn input{position:absolute;opacity:0;width:1px;height:1px}
 #msg{min-height:1.4em}
-@media (max-width:420px){.verdict .vm{font-size:21px}.time{font-size:32px}.legend{font-size:13px}}
+@media (prefers-reduced-motion: reduce){button,.verdict{transition:none}}
 </style>
 </head>
 <body>
 <div class="screen">
-  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 13</span></h1>
+  <h1>Sun Glare Map <span id="ver">· version 14</span></h1>
+  <form id="tripForm" class="search">
+    <div class="fields">
+      <div class="field"><span class="dot a">A</span><input type="text" id="fromTxt" placeholder="From: address or place" aria-label="From" autocomplete="off"><button type="button" class="icon" id="btnA" aria-label="Pick the start on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></button></div>
+      <div class="field"><span class="dot b">B</span><input type="text" id="toTxt" placeholder="To: address or place" aria-label="To" autocomplete="off"><button type="button" class="icon" id="btnB" aria-label="Pick the end on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></button></div>
+    </div>
+    <div class="side">
+      <button type="button" class="icon" id="btnSwap" aria-label="Swap From and To"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M7 4v16M3 8l4-4 4 4M17 20V4M13 16l4 4 4-4"/></svg></button>
+    </div>
+    <button id="btnGo" type="submit" class="primary">Check my trip</button>
+  </form>
+  <p class="hint" id="tripHint">Type two places, or tap a pin and then the map.</p>
   <div class="verdict" id="verdict" aria-live="polite">
     <svg id="vIcon" viewBox="0 0 48 48" aria-hidden="true"></svg>
-    <div><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
+    <div class="txt"><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
+    <button type="button" class="icon" id="btnClear" aria-label="Clear the trip" hidden>×</button>
   </div>
   <div class="mapwrap">
     <canvas id="map" role="img" aria-label="Map. Red roads have the sun in drivers' eyes at the chosen time."></canvas>
@@ -128,44 +162,26 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
   <div class="legend" id="legend">
     <span class="key"><span class="sw" style="height:4px;background:var(--high)"></span>Sun in your eyes</span>
     <span class="key"><span class="sw" style="height:3px;background:var(--med)"></span>A little sun</span>
-    <span class="key">North is up</span>
     <span class="key" id="keyFine"><span class="sw" style="height:2px;background:var(--road)"></span>Fine</span>
+    <span class="key"><span class="sw" style="height:4px;background:var(--accent)"></span>Your trip</span>
   </div>
-  <div class="timebar">
+  <section class="sheet" aria-label="Time of day">
     <div class="timetop">
-      <div class="time" id="timeText">4:15 pm</div>
-      <div class="small">Drag to move the sun</div>
+      <div><div class="small">Leaving at</div><div class="time" id="timeText">4:15 pm</div></div>
+      <button id="btnPlay" type="button" class="primary" aria-label="Play the day">▶</button>
     </div>
     <svg id="sky" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
     <input type="range" id="time" min="0" max="1435" step="5" value="975" aria-label="Time of day, US Central">
-    <div class="three">
+    <div class="chipsrow">
       <button id="btnAm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9 6l3-3 3 3"/></svg>Morning</button>
       <button id="btnNow" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Now</button>
       <button id="btnPm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v5M9 6l3 3 3-3"/></svg>Evening</button>
-      <button id="btnPlay" type="button" class="primary" aria-label="Play the day">▶</button>
     </div>
-  </div>
+  </section>
+  <div id="tripOut" class="card" style="padding:14px 16px"></div>
 </div>
 
 <div class="below">
-  <section class="card">
-    <h2>My trip</h2>
-    <form id="tripForm" class="addr">
-      <label for="fromTxt" class="small">From</label>
-      <input type="text" id="fromTxt" autocomplete="street-address" placeholder="100 N Kirkwood Rd, Kirkwood MO">
-      <label for="toTxt" class="small">To</label>
-      <input type="text" id="toTxt" placeholder="1 N Grand Blvd, St. Louis MO">
-      <button id="btnGo" type="submit" class="primary">Check my trip</button>
-    </form>
-    <p class="small" id="tripHint" style="margin-top:12px">Or pick on the map: tap Start, then tap the map. Do the same for End.</p>
-    <div class="two">
-      <button id="btnA" type="button">Start (A)</button>
-      <button id="btnB" type="button">End (B)</button>
-    </div>
-    <div id="tripOut" style="margin-top:12px"></div>
-    <button id="btnClear" type="button" style="margin-top:10px;min-height:40px;padding:8px 12px;font-weight:500">Clear trip</button>
-  </section>
-
   <details id="more">
     <summary>More: date, worst roads, real map data, export, how it works</summary>
     <div class="row"><label for="date" class="small">Date</label><input type="date" id="date"></div>
@@ -368,7 +384,10 @@ var BN=nodeRoads(BUILTIN);
 var cv=document.getElementById('map'),ctx=cv.getContext('2d');
 var roads=[],segs=[],center={lat:38.62,lng:-90.33},view={cx:0,cy:0,k:1},W=0,H=0,dpr=1;
 var day=[],riseMin=null,setMin=null,sun={az:0,alt:0},selected=-1,playing=null,srcText='';
-var hazards=[],graph=null,trip={a:-1,b:-1,path:null},pickMode=null;
+var hazards=[],graph=null,trip={a:-1,b:-1,path:null},pickMode=null,ends={a:null,b:null},MAPPT='Point on the map';
+var SUN='<circle cx="24" cy="24" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/></g>',CHECK='<circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><path d="M14 25l7 7 13-15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';
+function invY(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD}
+function tripOn(){return !!(trip.line||trip.path)}
 var tfmt=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'});
 function clock(ts){return tfmt.format(new Date(ts)).toLowerCase()}
 var el=function(id){return document.getElementById(id)};
@@ -418,11 +437,11 @@ function update(){
     r.innerHTML='<span class="small">'+a.o.km.toFixed(1)+' km </span><span class="pill '+(lv===3?'high':'med')+'">'+(lv===3?'Strong':'A little')+'</span>';
     li.appendChild(b);li.appendChild(r);ul.appendChild(li)});
   var hiN=0,medN=0;Object.keys(by).forEach(function(k){if(level(by[k].top)===3)hiN++;else medN++});
-  var V=el('verdict'),ic=el('vIcon'),SUN='<circle cx="24" cy="24" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/></g>';
+  var V=el('verdict'),ic=el('vIcon');
   if(sun.alt<-0.5){V.className='verdict v-night';ic.innerHTML='<path d="M30 6a18 18 0 1 0 12 30A15 15 0 0 1 30 6z" fill="currentColor"/>';el('vMain').textContent='The sun is down';el('vSub').textContent='No sun in anyone\u2019s eyes.'}
   else if(hiN){V.className='verdict v-high';ic.innerHTML=SUN;el('vMain').textContent='Sun in drivers\u2019 eyes on '+hiN+(hiN===1?' road':' roads');el('vSub').textContent='Worst: '+arr[0].n+', driving '+dirName(arr[0].o.d)+'. Red roads on the map.'}
   else if(medN){V.className='verdict v-med';ic.innerHTML=SUN;el('vMain').textContent='A little sun in drivers\u2019 eyes';el('vSub').textContent=medN+(medN===1?' road':' roads')+' affected. Orange on the map.'}
-  else{V.className='verdict v-ok';ic.innerHTML='<circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><path d="M14 25l7 7 13-15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';el('vMain').textContent='Roads are fine right now';el('vSub').textContent=sun.alt>=25?'The sun is high in the sky.':'No road points at the sun.'}
+  else{V.className='verdict v-ok';ic.innerHTML=CHECK;el('vMain').textContent='Roads are fine right now';el('vSub').textContent=sun.alt>=25?'The sun is high in the sky.':'No road points at the sun.'}
   drawSky(min);
   if(selected>=0)showSel();showTrip();draw();
 }
@@ -486,7 +505,7 @@ function draw(){
   var ink=css('--ink'),bg=css('--mapbg'),vis=[];
   for(var hI=0;hI<hazards.length&&vis.length<=40;hI++){var hx=sx(hazards[hI].lng),hy=sy(my(hazards[hI].lat));if(hx>0&&hx<W&&hy>0&&hy<H)vis.push([hx,hy])}
   if(vis.length<=40){ctx.lineWidth=1.5;ctx.strokeStyle=ink;ctx.fillStyle=bg;vis.forEach(function(v){ctx.beginPath();ctx.arc(v[0],v[1],3.5,0,7);ctx.fill();ctx.stroke()})}
-  ctx.font='500 12px Barlow, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.font='500 12px Manrope, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
   if(!tiles.on){var placed=[],seenName={},minK=view.k>12000?0:view.k>3000?45:60,cand=[];
   for(var ri=0;ri<roads.length;ri++){var r=roads[ri];if(!r.name||seenName[r.name])continue;if(!r.label&&(r.kmh||35)<minK)continue;
     var p=r.pts[Math.floor(r.pts.length/2)],x=sx(p[1]),y=sy(my(p[0]));if(x<34||x>W-34||y<14||y>H-14)continue;
@@ -496,47 +515,48 @@ function draw(){
     for(var k=0;k<placed.length;k++){if(Math.abs(placed[k][0]-c[1])<(placed[k][2]+w)/2+6&&Math.abs(placed[k][1]-c[2])<22){hit=true;break}}
     if(hit)continue;placed.push([c[1],c[2],w]);
     ctx.fillStyle=bg;ctx.globalAlpha=0.82;ctx.fillRect(c[1]-w/2,c[2]-9,w,18);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText(c[3],c[1],c[2])}}
-  [['A',trip.a,trip.A],['B',trip.b,trip.B]].forEach(function(m){var x,y;if(trip.line&&m[2]){x=sx(m[2].lng);y=sy(my(m[2].lat))}else if(m[1]>=0&&graph){x=sx(graph.nlng[m[1]]);y=sy(my(graph.nlat[m[1]]))}else return;
+  [['A',trip.a,trip.A],['B',trip.b,trip.B]].forEach(function(m){var x,y;if(trip.line&&m[2]){x=sx(m[2].lng);y=sy(my(m[2].lat))}else if(m[1]>=0&&graph){x=sx(graph.nlng[m[1]]);y=sy(my(graph.nlat[m[1]]))}else if(ends[m[0].toLowerCase()]){var en=ends[m[0].toLowerCase()];x=sx(en.lng);y=sy(my(en.lat))}else return;
     ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fillStyle=css('--accent');ctx.fill();ctx.strokeStyle=css('--surface');ctx.lineWidth=2;ctx.stroke();
-    ctx.fillStyle=css('--surface');ctx.font='600 13px Barlow, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
+    ctx.fillStyle=css('--surface');ctx.font='700 13px Manrope, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
   ctx.textAlign='center';ctx.textBaseline='middle';
-  ctx.beginPath();ctx.arc(26,30,17,0,7);ctx.fillStyle=css('--surface');ctx.globalAlpha=0.92;ctx.fill();ctx.globalAlpha=1;ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.stroke();
-  ctx.fillStyle=ink;ctx.beginPath();ctx.moveTo(26,17);ctx.lineTo(31,26);ctx.lineTo(21,26);ctx.closePath();ctx.fill();
-  ctx.font='600 12px Barlow, Arial, sans-serif';ctx.fillText('N',26,36);
-  if(sun.alt>-0.83){var a=sun.az*RAD,R=Math.max(60,Math.min(W,H)/2-46),px=W/2+Math.sin(a)*R,py=H/2-Math.cos(a)*R;
-    ctx.strokeStyle=css('--low');ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();
-    for(var ry=0;ry<8;ry++){var an=ry*Math.PI/4;ctx.moveTo(px+Math.cos(an)*15,py+Math.sin(an)*15);ctx.lineTo(px+Math.cos(an)*20,py+Math.sin(an)*20)}ctx.stroke();
-    ctx.beginPath();ctx.arc(px,py,11,0,7);ctx.fillStyle=css('--low');ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.stroke();
-    var tw2=ctx.measureText('Sun').width+8;ctx.fillStyle=css('--surface');ctx.globalAlpha=0.85;ctx.fillRect(px-tw2/2,py+23,tw2,16);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText('Sun',px,py+31)}
+  var IN=24;
+  ctx.beginPath();ctx.arc(30,34,16,0,7);ctx.fillStyle=css('--surface');ctx.fill();
+  ctx.fillStyle=ink;ctx.beginPath();ctx.moveTo(30,22);ctx.lineTo(35,31);ctx.lineTo(25,31);ctx.closePath();ctx.fill();
+  ctx.font='700 11px Manrope, Arial, sans-serif';ctx.fillText('N',30,40);
+  if(sun.alt>-0.83){var a=sun.az*RAD,vx=Math.sin(a),vy=-Math.cos(a),hw=W/2-IN,hh=H/2-IN,tt=Math.min(Math.abs(vx)>1e-6?hw/Math.abs(vx):1e9,Math.abs(vy)>1e-6?hh/Math.abs(vy):1e9),px=W/2+vx*tt,py=H/2+vy*tt;
+    ctx.beginPath();ctx.arc(px,py,21,0,7);ctx.fillStyle=css('--surface');ctx.globalAlpha=0.9;ctx.fill();ctx.globalAlpha=1;
+    ctx.strokeStyle=css('--low');ctx.lineWidth=2.5;ctx.lineCap='round';ctx.beginPath();
+    for(var ry=0;ry<8;ry++){var an=ry*Math.PI/4;ctx.moveTo(px+Math.cos(an)*13,py+Math.sin(an)*13);ctx.lineTo(px+Math.cos(an)*17,py+Math.sin(an)*17)}ctx.stroke();
+    ctx.beginPath();ctx.arc(px,py,9.5,0,7);ctx.fillStyle=css('--low');ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=1.5;ctx.stroke()}
 }
 function resize(){var r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;var first=!W;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);if(first)fit();draw()}
 function zoomAt(f,x,y){var mx=(x-W/2)/view.k+view.cx,myy=(y-H/2)/view.k+view.cy;view.k*=f;view.cx=mx-(x-W/2)/view.k;view.cy=myy-(y-H/2)/view.k;draw()}
 function nearestNode(x,y){var best=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var dx=sx(graph.nlng[i])-x,dy=sy(my(graph.nlat[i]))-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=i}}return best}
 function setPick(m){pickMode=m;el('btnA').classList.toggle('on',m==='a');el('btnB').classList.toggle('on',m==='b');
-  el('tripHint').textContent=m?'Now tap the map where the trip '+(m==='a'?'starts':'ends')+'.':'Or pick on the map: tap Start, then tap the map. Do the same for End.';
-  if(m)document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})}
+  el('tripHint').textContent=m?'Now tap the map where the trip '+(m==='a'?'starts':'ends')+'.':'Type two places, or tap a pin and then the map.'}
 function solveTrip(){trip.line=null;trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==trip.b)?shortest(graph,trip.a,trip.b):null;showTrip();draw()}
 function showTrip(){
-  var o=el('tripOut');
-  el('btnA').textContent=(trip.a>=0||trip.line)?'Start (A) set':'Start (A)';el('btnB').textContent=(trip.b>=0||trip.line)?'End (B) set':'End (B)';
-  if(!trip.line&&(trip.a<0||trip.b<0)){o.innerHTML='';return}
+  var o=el('tripOut');el('btnClear').hidden=!(tripOn()||ends.a||ends.b||el('fromTxt').value||el('toTxt').value);
+  if(!tripOn()){o.innerHTML=(trip.a>=0&&trip.b>=0)?'<p class="small">No road path joins the two points on this map. Move one of them.</p>':'';return}
   var calc=function(ts){return trip.line?lineCalc(trip.line,ts,trip.dur):tripCalc(trip.path,segs,roads,ts,center.lat,center.lng)};
-  if(!trip.line&&!trip.path){o.innerHTML='<p class="small">No path joins A and B on the loaded roads. Move one of them onto a connected road.</p>';return}
   var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=calc(dep);trip.lv=r.lv;
   var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:calc(zoned(p[0],p[1],p[2],m)).gl}}).filter(Boolean);
   var best=res.reduce(function(x,y){return y.gl<x.gl?y:x});
-  var h='<p class="big">'+(r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes')+'</p>';
-  h+='<p class="small" style="margin-top:2px">'+r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep)+'.</p>';
-  if(trip.line&&trip.A&&trip.A.name)h+='<p class="small" style="margin-top:6px">A: '+esc(trip.A.name)+'<br>B: '+esc(trip.B.name)+'<br>If either is the wrong place, add more detail to the address, such as the ZIP code.</p>';
-  h+='<p class="small" style="margin-top:6px">Your trip is the thick line on the map: blue where it is fine, red or orange where the sun is in your eyes. Faded red roads are for people driving the other way.</p>';
-  if(best.gl<r.gl-1)h+='<button type="button" class="primary" data-m="'+best.m+'" style="margin-top:10px;width:100%">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
-  h+='<details><summary>Other leaving times and where it happens</summary><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+': '+Math.round(x.gl)+' min</button>'}).join('')+'</div>';
-  if(r.st.length)h+='<ul class="list">'+r.st.slice(0,8).map(function(s){return '<li><span>'+(s.name||(trip.line?'Your route':'Unnamed road'))+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul>';
-  h+='</details>';
+  el('verdict').className='verdict '+(r.hi>=0.5?'v-high':r.gl>=0.5?'v-med':'v-ok');el('vIcon').innerHTML=r.gl>=0.5?SUN:CHECK;
+  el('vMain').textContent=r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes';
+  el('vSub').textContent=r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep);
+  var h='';
+  if(best.gl<r.gl-1)h+='<button type="button" class="primary wide" data-m="'+best.m+'">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
+  h+='<div><p class="small" style="margin-bottom:6px">Minutes with the sun in your eyes if you leave at</p><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+' · '+Math.round(x.gl)+'</button>'}).join('')+'</div></div>';
+  if(trip.line&&trip.A&&trip.A.name&&(trip.A.name!==MAPPT||trip.B.name!==MAPPT))h+='<p class="small">A: '+esc(trip.A.name)+'<br>B: '+esc(trip.B.name)+'<br>Wrong place? Add the city, state or ZIP code.</p>';
+  if(r.st.length)h+='<details><summary>Where it happens</summary><ul class="list">'+r.st.slice(0,8).map(function(s){return '<li><span>'+(s.name||(trip.line?'Your route':'Unnamed road'))+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul></details>';
   o.innerHTML=h;
 }
 function pick(x,y){
-  if(pickMode){var n=nearestNode(x,y);if(n>=0){if(pickMode==='a')trip.a=n;else trip.b=n;setPick(pickMode==='a'&&trip.b<0?'b':null);solveTrip()}return}
+  if(pickMode){var pt={lat:invY((y-H/2)/view.k+view.cy),lng:(x-W/2)/view.k+view.cx,name:MAPPT};
+    if(pickMode==='a'){ends.a=pt;el('fromTxt').value=MAPPT}else{ends.b=pt;el('toTxt').value=MAPPT}
+    var nx=(pickMode==='a'&&!el('toTxt').value.trim())?'b':(pickMode==='b'&&!el('fromTxt').value.trim())?'a':null;setPick(nx);showTrip();draw();
+    if(!nx&&el('fromTxt').value.trim()&&el('toTxt').value.trim())runTrip();return}
   var best=-1,bd=18*18;for(var i=0;i<segs.length;i++){var s=segs[i],x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by),dx=x2-x1,dy=y2-y1,L=dx*dx+dy*dy;
     var t=L?Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/L)):0,ex=x1+t*dx-x,ey=y1+t*dy-y,d=ex*ex+ey*ey;if(d<bd){bd=d;best=i}}
   selected=best;showSel();draw()}
@@ -586,7 +606,7 @@ el('file').addEventListener('change',function(){var f=el('file').files[0];if(!f)
       setRoads(list,d.hazards,'Showing '+list.length+' roads and '+d.hazards.length+' signals, crossings and schools from your file, '+f.name+'.');say('')}
     catch(err){say('That file could not be read as JSON. Export it again as GeoJSON or Overpass JSON.')}};
   rd.readAsText(f)});
-el('btnReset').onclick=function(){setRoads(BN.roads,BN.hazards,BUILT);demoTrip();say('')};
+el('btnReset').onclick=function(){setRoads(BN.roads,BN.hazards,BUILT);if(el('fromTxt').value===DEMO[0])demoTrip();say('')};
 var EP=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
 function liveLoad(s,w,n,e,light){
   var span=Math.max(e-w,n-s);
@@ -624,34 +644,39 @@ function geocodeBoth(f,t){
 }
 function wait(ms){return new Promise(function(ok){setTimeout(ok,ms)})}
 function hint(t){el('tripHint').textContent=t}
-el('tripForm').addEventListener('submit',function(ev){
-  ev.preventDefault();var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
-  if(!f||!t){hint('Type both a From address and a To address.');return}
-  hint('Finding the two addresses…');el('btnGo').disabled=true;var A,B;
-  geocodeBoth(f,t).then(function(ab){A=ab[0];B=ab[1];hint('Finding the route…');
+function geocode1(q){return geocodeSlow(q).catch(function(err){return geocodeFast(q).catch(function(){throw err})})}
+function runTrip(){
+  var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
+  if(!f||!t){hint('Type both places, or tap a pin and then the map.');return}
+  var pa=(f===MAPPT&&ends.a)?ends.a:null,pb=(t===MAPPT&&ends.b)?ends.b:null;if(!pa)ends.a=null;if(!pb)ends.b=null;
+  hint('Finding your trip…');el('btnGo').disabled=true;setPick(null);var A,B;
+  var both=(pa&&pb)?Promise.resolve([pa,pb]):pa?geocode1(t).then(function(b){return [pa,b]}):pb?geocode1(f).then(function(a){return [a,pb]}):geocodeBoth(f,t);
+  both.then(function(ab){A=ab[0];B=ab[1];hint('Finding the route…');
     return fetch('https://router.project-osrm.org/route/v1/driving/'+A.lng+','+A.lat+';'+B.lng+','+B.lat+'?overview=full&geometries=geojson').then(function(r){if(!r.ok)throw new Error('route');return r.json()})
      .then(function(j){var r=j.routes&&j.routes[0];if(!r||!r.geometry)throw new Error('route');return r},function(){return null})})
    .then(function(r){
     var s=Math.min(A.lat,B.lat),n=Math.max(A.lat,B.lat),w=Math.min(A.lng,B.lng),e=Math.max(A.lng,B.lng),my_=Math.max(0.01,(n-s)*0.2),mx_=Math.max(0.013,(e-w)*0.2);
     if(r){ // quick path: show the answer now, bring in the surrounding roads afterwards
       trip={a:-1,b:-1,path:null,line:r.geometry.coordinates,dur:r.duration,A:A,B:B};setPick(null);fitLine();update();
-      hint('Trip found. Drag the time to change when you leave.');document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'});
+      hint('Trip found. Drag the time to see other leaving times.');
       say('Loading the map around your trip…');
       liveLoad(s-my_,w-mx_,n+my_,e+mx_,true).then(function(d){if(d.roads.length&&trip.line){setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real main roads from OpenStreetMap around your trip.',true);say('')}},function(err){say('Your trip is right, but the roads around it could not be loaded. '+liveWhy(err))});
       return}
     hint('Loading the roads between them…'); // fallback: no route service, so find the path on downloaded roads
     return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(err){say('Real roads could not be loaded, so the trip uses the roads already on the map. '+liveWhy(err))})
-     .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to change when you leave.':'The two addresses were found, but no road path joins them on this map.');
-       document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})})})
+     .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to see other leaving times.':'The two addresses were found, but no road path joins them on this map.');})})
    .catch(function(err){var m=String(err&&err.message||'');
      hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':(/claude/i.test(location.hostname)?'Address lookup is blocked inside Claude. Open the page from its own web link in a browser, or pick the points on the map.':'Address lookup did not work. Wait a minute and try again, or pick the points on the map.'))})
    .then(function(){el('btnGo').disabled=false});
-});
+}
+el('tripForm').addEventListener('submit',function(ev){ev.preventDefault();runTrip()});
+el('btnSwap').onclick=function(){var a=el('fromTxt'),b=el('toTxt'),v=a.value;a.value=b.value;b.value=v;var e=ends.a;ends.a=ends.b;ends.b=e;
+  if(a.value.trim()&&b.value.trim())runTrip();else{showTrip();draw()}};
 var CACHE='glare-roads-v1',METRO=[38.48,-90.62,38.80,-90.16];
 function pack(text){return {compact:1,text:text,roads:roads.map(function(r){var p=[];r.pts.forEach(function(c){p.push(+c[0].toFixed(5),+c[1].toFixed(5))});return [r.name,r.oneway?1:0,r.kmh||35,p]}),hazards:hazards.map(function(z){return [+z.lat.toFixed(5),+z.lng.toFixed(5),z.type]})}}
 function unpack(j){return {text:j.text||'',roads:j.roads.map(function(r){var p=[];for(var i=0;i<r[3].length;i+=2)p.push([r[3][i],r[3][i+1]]);return {name:r[0],oneway:!!r[1],kmh:r[2],pts:p}}),hazards:(j.hazards||[]).map(function(z){return {lat:z[0],lng:z[1],type:z[2]}})}}
 function parseAny(j){if(j.compact)return unpack(j);var d=j.elements?fromOverpass(j):fromGeo(j);d.text='';return d}
-function useData(d,text){var keep={cx:view.cx,cy:view.cy,k:view.k},hadLine=!!trip.line,hadDemo=!trip.line&&trip.path&&!pickMode;
+function useData(d,text){var keep={cx:view.cx,cy:view.cy,k:view.k},hadLine=!!trip.line,hadDemo=!trip.line&&trip.path&&!pickMode&&!ends.a&&!ends.b&&el('fromTxt').value===DEMO[0];
   setRoads(d.roads,d.hazards,text,true);if(!hadLine){view=keep;if(hadDemo)demoTrip()}draw()}
 function autoLoad(){
   if(/claude/i.test(location.hostname)||location.protocol==='file:')return;
@@ -669,10 +694,11 @@ el('btnSaveRoads').onclick=function(){
     say('Saved roads.json. Upload it to the same folder as this page and the roads will load instantly for everyone.')}catch(e){say('Saving is blocked here. Open the page in a browser and try again.')}};
 var BUILT='Showing a built-in sketch of '+BUILTIN.length+' main St. Louis roads with '+BN.hazards.length+' junctions between them. Positions are approximate and drawn by hand, so use real roads for any real check.';
 function near(la,lo){var b=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var d=distKm(la,lo,graph.nlat[i],graph.nlng[i]);if(d<bd){bd=d;b=i}}return b}
-function demoTrip(){trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
+var DEMO=['Downtown St. Louis, MO','Fenton, MO'];
+function demoTrip(){if(!el('fromTxt').value&&!el('toTxt').value){el('fromTxt').value=DEMO[0];el('toTxt').value=DEMO[1]}trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
 el('btnA').onclick=function(){setPick(pickMode==='a'?null:'a')};
 el('btnB').onclick=function(){setPick(pickMode==='b'?null:'b')};
-el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null,line:null};setPick(null);el('btnA').textContent='Start (A)';el('btnB').textContent='End (B)';showTrip();draw()};
+el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null,line:null};ends={a:null,b:null};el('fromTxt').value='';el('toTxt').value='';setPick(null);update()};
 el('tripOut').addEventListener('click',function(e){var b=e.target.closest('button[data-m]');if(b)setTime(+b.getAttribute('data-m'))});
 el('date').value=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
 window.addEventListener('resize',resize);
