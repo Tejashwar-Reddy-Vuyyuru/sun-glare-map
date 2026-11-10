@@ -14,6 +14,7 @@ Status: working prototype, first built for St. Louis. The scoring has not yet be
 - Colours roads by glare risk for any date and time, with a slider that moves the sun through the day.
 - Shows, for any road, which direction of travel faces the sun and the time windows when it happens.
 - Raises risk near traffic signals, junctions, pedestrian crossings and schools.
+- Hides glare when the hourly forecast says the sky is overcast, with a switch to ignore weather.
 - Draws on a standard street map, with glare lines blended so street names stay readable.
 - Ships as a plugin (`glare-layer.js`) that adds a "Sun glare" layer to Leaflet, MapLibre, Mapbox and Google maps.
 
@@ -91,7 +92,8 @@ The main page can also export the affected roads for one moment as KML (Google E
 ## Known limits
 
 - Hills, buildings and trees that block the sun are ignored, so the map over-warns in built-up or wooded streets.
-- Clouds and wet-road reflection are ignored.
+- Cloud cover is a single hourly percentage for the whole area (Open-Meteo): 85% or more hides glare, 60 to 85% halves it. Low sun can still break through broken cloud.
+- Wet-road reflection is ignored.
 - Road slope is ignored.
 - Times are US Central only.
 - Trip times come from the route service or a fixed speed per road class, with no live traffic.
@@ -108,4 +110,3 @@ The main page can also export the affected roads for one moment as KML (Google E
 1. Validate against crash records: test whether crashes are more frequent on a segment during its predicted glare windows than outside them.
 2. Check predictions against timestamped street-level photos.
 3. Remove false alarms using building and terrain heights.
-4. Add a cloud-cover feed.

@@ -88,6 +88,9 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .sheet{padding:14px 16px 16px}
 .timetop{display:flex;align-items:center;justify-content:space-between;gap:10px}
 .time{font-family:var(--display);font-weight:700;font-size:34px;line-height:1;letter-spacing:-.02em}
+.wx{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;margin-top:8px}
+.sw2{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.sw2 input{width:18px;height:18px;accent-color:var(--accent)}
 #btnPlay{width:48px;height:48px;border-radius:50%;padding:0;font-size:18px}
 #sky{width:100%;height:58px;display:block;margin-top:4px}
 #sky .base{stroke:var(--line);stroke-width:2}
@@ -129,7 +132,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>Sun Glare Map <span id="ver">· version 16</span></h1>
+  <h1>Sun Glare Map <span id="ver">· version 17</span></h1>
   <form id="tripForm" class="search">
     <div class="fields">
       <div class="field"><span class="dot a">A</span><input type="text" id="fromTxt" placeholder="From: address or place" aria-label="From" autocomplete="off"><button type="button" class="icon" id="btnA" aria-label="Pick the start on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></button></div>
@@ -171,6 +174,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
       <div><div class="small">Leaving at</div><div class="time" id="timeText">4:15 pm</div></div>
       <button id="btnPlay" type="button" class="primary" aria-label="Play the day">▶</button>
     </div>
+    <div class="wx"><span class="small" id="wxText">Checking the weather…</span><label class="small sw2"><input type="checkbox" id="wxOn" checked> Use weather</label></div>
     <svg id="sky" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
     <input type="range" id="time" min="0" max="1435" step="5" value="975" aria-label="Time of day, US Central">
     <div class="chipsrow">
@@ -226,7 +230,8 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
         <li>Both directions of a two-way road are checked. One-way roads are checked in their direction only.</li>
         <li>Risk is the glare score raised near places where a driver must see clearly: 60% higher at traffic signals, 50% at junctions between main roads, 40% at crossings and schools. Small rings mark them when you zoom in.</li>
         <li>A typed trip uses a public route service (OSRM). A trip picked by tapping follows the quickest path on the loaded roads. Either way the sun moves as the trip goes on.</li>
-        <li>Not included yet: hills, buildings and trees that block the sun, clouds, and wet-road reflection.</li>
+        <li>Cloud cover comes from the Open-Meteo hourly forecast, for the past week and the next 16 days. At 85% cloud or more no glare is shown, and between 60% and 85% it is halved. Outside those dates a clear sky is assumed.</li>
+    <li>Not included yet: hills, buildings and trees that block the sun, and wet-road reflection.</li>
         <li>Times are US Central. The sun position is calculated for the middle of the loaded roads.</li>
       </ul>
     </div>
@@ -329,9 +334,9 @@ function shortest(g,a,b){
   }
   if(dist[b]===Infinity)return null;var path=[];for(var v=b;v!==a;v=prev[v])path.push({i:pe[v].i,f:pe[v].f});return path.reverse();
 }
-function tripCalc(path,segs,roads,departTs,lat,lng){
+function tripCalc(path,segs,roads,departTs,lat,lng,cf){if(cf===undefined)cf=1;
   var t=departTs,gl=0,hi=0,km=0,st=[],cur=null,lv=[];
-  path.forEach(function(p){var s=segs[p.i],r=roads[s.r],dur=s.km/r.kmh*60,sp=sunPos(t+dur*30000,lat,lng),b=p.f?s.brg:(s.brg+180)%360,l=level(glareDir(b,sp.az,sp.alt)*s.w);
+  path.forEach(function(p){var s=segs[p.i],r=roads[s.r],dur=s.km/r.kmh*60,sp=sunPos(t+dur*30000,lat,lng),b=p.f?s.brg:(s.brg+180)%360,l=level(glareDir(b,sp.az,sp.alt)*s.w*cf);
     km+=s.km;lv.push(l);
     if(l>=2){gl+=dur;if(l===3)hi+=dur;
       if(cur&&cur.r===s.r&&Math.abs(t-cur.t1)<1000){cur.t1=t+dur*60000;cur.km+=s.km;cur.l=Math.max(cur.l,l)}
@@ -340,11 +345,11 @@ function tripCalc(path,segs,roads,departTs,lat,lng){
     t+=dur*60000});
   return {km:km,min:(t-departTs)/60000,gl:gl,hi:hi,st:st,lv:lv};
 }
-function lineCalc(line,departTs,dur){
+function lineCalc(line,departTs,dur,cf){if(cf===undefined)cf=1;
   var tot=0,i;for(i=0;i<line.length-1;i++)tot+=distKm(line[i][1],line[i][0],line[i+1][1],line[i+1][0]);
   var kmh=dur>0&&tot>0?tot/(dur/3600):50,t=departTs,gl=0,hi=0,st=[],cur=null,lv=[];
   for(i=0;i<line.length-1;i++){var a=line[i],b=line[i+1],km=distKm(a[1],a[0],b[1],b[0]);if(!km){lv.push(0);continue}
-    var d=km/kmh*60,sp=sunPos(t+d*30000,(a[1]+b[1])/2,(a[0]+b[0])/2),brg=bearing(a[1],a[0],b[1],b[0]),l=level(glareDir(brg,sp.az,sp.alt));lv.push(l);
+    var d=km/kmh*60,sp=sunPos(t+d*30000,(a[1]+b[1])/2,(a[0]+b[0])/2),brg=bearing(a[1],a[0],b[1],b[0]),l=level(glareDir(brg,sp.az,sp.alt)*cf);lv.push(l);
     if(l>=2){gl+=d;if(l===3)hi+=d;var dn=dirName(brg);
       if(cur&&cur.d===dn&&Math.abs(t-cur.t1)<1000){cur.t1=t+d*60000;cur.km+=km;cur.l=Math.max(cur.l,l)}else{cur={name:'',d:dn,t0:t,t1:t+d*60000,km:km,l:l};st.push(cur)}}
     else cur=null;
@@ -387,6 +392,15 @@ var roads=[],segs=[],center={lat:38.62,lng:-90.33},view={cx:0,cy:0,k:1},W=0,H=0,
 var day=[],riseMin=null,setMin=null,sun={az:0,alt:0},selected=-1,playing=null,srcText='';
 var hazards=[],graph=null,trip={a:-1,b:-1,path:null},pickMode=null,ends={a:null,b:null},MAPPT='Point on the map';
 var SUN='<circle cx="24" cy="24" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/></g>',CHECK='<circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><path d="M14 25l7 7 13-15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';
+var wx={on:true,data:null,state:'wait'},CLOUD='<path d="M14 36h21a9 9 0 0 0 1-18 12 12 0 0 0-23 3 8 8 0 0 0 1 15z" fill="currentColor"/>';
+function cloudAt(min){if(!wx.on||!wx.data)return null;var hh=Math.floor(min/60),c=wx.data[el('date').value+'T'+(hh<10?'0':'')+hh+':00'];return (c===undefined||c===null)?null:c}
+function cfOf(c){return c===null?1:c>=85?0:c>=60?0.5:1}
+function loadWx(){
+  if(/claude/i.test(location.hostname)||location.protocol==='file:'){wx.state='off';update();return}
+  fetch('https://api.open-meteo.com/v1/forecast?latitude='+center.lat.toFixed(3)+'&longitude='+center.lng.toFixed(3)+'&hourly=cloud_cover&timezone=America%2FChicago&past_days=7&forecast_days=16')
+   .then(function(r){if(!r.ok)throw new Error('wx');return r.json()}).then(function(j){var m={};j.hourly.time.forEach(function(t,i){m[t]=j.hourly.cloud_cover[i]});wx.data=m;wx.state='ok';update()})
+   .catch(function(){wx.state='off';update()});
+}
 function invY(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD}
 function tripOn(){return !!(trip.line||trip.path)}
 var tfmt=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'});
@@ -425,8 +439,10 @@ function update(){
   el('timeText').textContent=hm(min);
   el('cAlt').textContent=sun.alt<-0.83?'below horizon':sun.alt.toFixed(1)+'°';
   el('cAz').textContent=dirName(sun.az)+' ('+Math.round(sun.az)+'°)';
+  var cl=cloudAt(min),cf=cfOf(cl);
+  el('wxText').textContent=!wx.on?'Weather ignored: showing a clear day':wx.state==='wait'?'Checking the weather…':wx.state==='off'?'Weather is not available here, so a clear sky is assumed':cl===null?'No forecast for this date and hour, so a clear sky is assumed':(cl>=85?'Cloudy':cl>=60?'Partly cloudy':'Mostly clear')+' at this hour ('+Math.round(cl)+'% cloud)';
   var km=0,by={};lvIdx=[[],[],[],[]];
-  for(var i=0;i<segs.length;i++){var s=segs[i],g=glareSeg(s.brg,roads[s.r].oneway,sun.az,sun.alt);s.s=g.s;s.g=g.s*s.w;s.d=g.brg;s.l=level(s.g);lvIdx[s.l].push(i);
+  for(var i=0;i<segs.length;i++){var s=segs[i],g=glareSeg(s.brg,roads[s.r].oneway,sun.az,sun.alt);s.s=g.s;s.g=g.s*s.w*cf;s.d=g.brg;s.l=level(s.g);lvIdx[s.l].push(i);
     if(s.l===3)km+=s.km;
     if(s.l>=2){var nm=roads[s.r].name;if(nm){var o=by[nm]||(by[nm]={w:0,km:0,top:0,d:g.brg,i:i});o.w+=s.km*s.g;o.km+=s.km;if(s.g>o.top){o.top=s.g;o.d=g.brg;o.i=i}}}}
   el('cKm').textContent=km.toFixed(1)+' km';
@@ -439,7 +455,8 @@ function update(){
     li.appendChild(b);li.appendChild(r);ul.appendChild(li)});
   var hiN=0,medN=0;Object.keys(by).forEach(function(k){if(level(by[k].top)===3)hiN++;else medN++});
   var V=el('verdict'),ic=el('vIcon');
-  if(sun.alt<-0.5){V.className='verdict v-night';ic.innerHTML='<path d="M30 6a18 18 0 1 0 12 30A15 15 0 0 1 30 6z" fill="currentColor"/>';el('vMain').textContent='The sun is down';el('vSub').textContent='No sun in anyone\u2019s eyes.'}
+  if(sun.alt>=-0.5&&sun.alt<25&&cf===0){V.className='verdict v-ok';ic.innerHTML=CLOUD;el('vMain').textContent='Cloudy, so no sun in drivers\u2019 eyes';el('vSub').textContent='Cloud cover is '+Math.round(cl)+'% at this hour.'}
+  else if(sun.alt<-0.5){V.className='verdict v-night';ic.innerHTML='<path d="M30 6a18 18 0 1 0 12 30A15 15 0 0 1 30 6z" fill="currentColor"/>';el('vMain').textContent='The sun is down';el('vSub').textContent='No sun in anyone\u2019s eyes.'}
   else if(hiN){V.className='verdict v-high';ic.innerHTML=SUN;el('vMain').textContent='Sun in drivers\u2019 eyes on '+hiN+(hiN===1?' road':' roads');el('vSub').textContent='Worst: '+arr[0].n+', driving '+dirName(arr[0].o.d)+'. Red roads on the map.'}
   else if(medN){V.className='verdict v-med';ic.innerHTML=SUN;el('vMain').textContent='A little sun in drivers\u2019 eyes';el('vSub').textContent=medN+(medN===1?' road':' roads')+' affected. Orange on the map.'}
   else{V.className='verdict v-ok';ic.innerHTML=CHECK;el('vMain').textContent='Roads are fine right now';el('vSub').textContent=sun.alt>=25?'The sun is high in the sky.':'No road points at the sun.'}
@@ -548,13 +565,13 @@ function solveTrip(){trip.line=null;trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==tr
 function showTrip(){
   var o=el('tripOut');el('btnClear').hidden=!(tripOn()||ends.a||ends.b||el('fromTxt').value||el('toTxt').value);
   if(!tripOn()){o.innerHTML=(trip.a>=0&&trip.b>=0)?'<p class="small">No road path joins the two points on this map. Move one of them.</p>':'';return}
-  var calc=function(ts){return trip.line?lineCalc(trip.line,ts,trip.dur):tripCalc(trip.path,segs,roads,ts,center.lat,center.lng)};
-  var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=calc(dep);trip.lv=r.lv;
-  var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:calc(zoned(p[0],p[1],p[2],m)).gl}}).filter(Boolean);
+  var calc=function(ts,m){var c=cfOf(cloudAt(m));return trip.line?lineCalc(trip.line,ts,trip.dur,c):tripCalc(trip.path,segs,roads,ts,center.lat,center.lng,c)};
+  var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=calc(dep,min),cfNow=cfOf(cloudAt(min));trip.lv=r.lv;
+  var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:calc(zoned(p[0],p[1],p[2],m),m).gl}}).filter(Boolean);
   var best=res.reduce(function(x,y){return y.gl<x.gl?y:x});
-  el('verdict').className='verdict '+(r.hi>=0.5?'v-high':r.gl>=0.5?'v-med':'v-ok');el('vIcon').innerHTML=r.gl>=0.5?SUN:CHECK;
+  el('verdict').className='verdict '+(r.hi>=0.5?'v-high':r.gl>=0.5?'v-med':'v-ok');el('vIcon').innerHTML=r.gl>=0.5?SUN:cfNow<1?CLOUD:CHECK;
   el('vMain').textContent=r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes';
-  el('vSub').textContent=r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep);
+  el('vSub').textContent=r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep)+(cfNow===0?'. Cloudy sky.':cfNow<1?'. Partly cloudy.':'');
   var h='';
   if(best.gl<r.gl-1)h+='<button type="button" class="primary wide" data-m="'+best.m+'">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
   h+='<div><p class="small" style="margin-bottom:6px">Minutes with the sun in your eyes if you leave at</p><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+' · '+Math.round(x.gl)+'</button>'}).join('')+'</div></div>';
@@ -743,6 +760,7 @@ el('btnCopyGeo').onclick=function(){copyText(toGeo(),'GeoJSON')};
 el('btnKml').onclick=function(){if(!stretches().length){expSay('No red or orange roads at this time, so there is nothing to save.');return}
   try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toKml()],{type:'application/vnd.google-earth.kml+xml'}));a.download='sun-glare.kml';document.body.appendChild(a);a.click();a.remove();
     expSay('If no file appeared, saving is blocked here. Use Copy KML, or open this page in a browser.')}catch(e){expSay('Saving is blocked here. Use Copy KML, or open this page in a browser.')}};
+el('wxOn').addEventListener('change',function(){wx.on=el('wxOn').checked;update()});
 el('selClose').onclick=function(){selected=-1;showSel();draw()};
 new MutationObserver(restyle).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
@@ -750,6 +768,7 @@ resize();setRoads(BN.roads,BN.hazards,BUILT);
 if(setMin!==null)setTime(setMin-40);
 demoTrip();
 autoLoad();
+loadWx();
 </script>
 </body>
 </html>
