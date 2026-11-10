@@ -276,7 +276,7 @@
       draw: function (fc) {
         layer.clearLayers();
         L.geoJSON(fc, {
-          style: function (f) { var hi = f.properties.level === 3; return { color: hi ? COLORS.high : COLORS.some, weight: hi ? 7 : 5, opacity: 0.9, lineCap: 'round' }; },
+          style: function (f) { var hi = f.properties.level === 3; return { color: hi ? COLORS.high : COLORS.some, weight: hi ? 4 : 3, opacity: 0.95, lineCap: 'round' }; },
           onEachFeature: function (f, l) { l.bindPopup(describe(f.properties)); }
         }).addTo(layer);
       }
@@ -292,7 +292,7 @@
       if (map.getSource(id)) return;
       map.addSource(id, { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
       map.addLayer({ id: id, type: 'line', source: id, layout: { 'line-cap': 'round', 'line-join': 'round' },
-        paint: { 'line-color': ['match', ['get', 'level'], 3, COLORS.high, COLORS.some], 'line-width': ['match', ['get', 'level'], 3, 6, 4], 'line-opacity': 0.9 } });
+        paint: { 'line-color': ['match', ['get', 'level'], 3, COLORS.high, COLORS.some], 'line-width': ['match', ['get', 'level'], 3, 4, 3], 'line-opacity': 0.95 } });
     }
     var ctl = controller({
       zoom: function () { return map.getZoom() + 1; },
@@ -320,7 +320,7 @@
   /** Google Maps JavaScript API: returns { show, hide, setTime, setRoads, refresh }. */
   function google(map, options) {
     var g = (options && options.google) || root.google, data = new g.maps.Data(), listener = null;
-    data.setStyle(function (f) { var hi = f.getProperty('level') === 3; return { strokeColor: hi ? COLORS.high : COLORS.some, strokeWeight: hi ? 7 : 5, strokeOpacity: 0.9 }; });
+    data.setStyle(function (f) { var hi = f.getProperty('level') === 3; return { strokeColor: hi ? COLORS.high : COLORS.some, strokeWeight: hi ? 4 : 3, strokeOpacity: 0.95 }; });
     var ctl = controller({
       zoom: function () { return map.getZoom(); },
       box: function () { var b = map.getBounds(), sw = b.getSouthWest(), ne = b.getNorthEast(); return [sw.lat(), sw.lng(), ne.lat(), ne.lng()]; },

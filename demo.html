@@ -80,7 +80,7 @@
       .then(function (j) {
         var r = j.routes && j.routes[0]; if (!r) throw new Error('No route found');
         if (routeLine) map.removeLayer(routeLine);
-        routeLine = L.geoJSON(r.geometry, { style: { color: '#0a4fb3', weight: 4, opacity: 0.5 } }).addTo(map);
+        routeLine = L.geoJSON(r.geometry, { style: { color: '#0a4fb3', weight: 3, opacity: 0.45 } }).addTo(map);
         map.fitBounds(routeLine.getBounds(), { padding: [30, 30] });
         glare.setRoute(r.geometry, { duration: r.duration }); // the one line that matters
         glare.bringToFront && glare.bringToFront();
