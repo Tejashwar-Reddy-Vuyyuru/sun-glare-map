@@ -93,6 +93,7 @@ canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-acti
 .sw2 input{width:18px;height:18px;accent-color:var(--accent)}
 #btnPlay{width:48px;height:48px;border-radius:50%;padding:0;font-size:18px}
 #sky{width:100%;height:58px;display:block;margin-top:4px}
+.skylbl{display:flex;justify-content:space-between;font-size:12px;margin-top:-2px}
 #sky .base{stroke:var(--line);stroke-width:2}
 #sky .arc{fill:none;stroke:var(--line);stroke-width:3}
 #sky .hot{fill:none;stroke:var(--med);stroke-width:6;stroke-linecap:round}
@@ -132,7 +133,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>Sun Glare Map <span id="ver">· version 17</span></h1>
+  <h1>Sun Glare Map <span id="ver">· version 18</span></h1>
   <form id="tripForm" class="search">
     <div class="fields">
       <div class="field"><span class="dot a">A</span><input type="text" id="fromTxt" placeholder="From: address or place" aria-label="From" autocomplete="off"><button type="button" class="icon" id="btnA" aria-label="Pick the start on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></button></div>
@@ -176,6 +177,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
     </div>
     <div class="wx"><span class="small" id="wxText">Checking the weather…</span><label class="small sw2"><input type="checkbox" id="wxOn" checked> Use weather</label></div>
     <svg id="sky" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <div class="skylbl small"><span id="lblRise"></span><span id="lblSet"></span></div>
     <input type="range" id="time" min="0" max="1435" step="5" value="975" aria-label="Time of day, US Central">
     <div class="chipsrow">
       <button id="btnAm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9 6l3-3 3 3"/></svg>Morning</button>
@@ -350,10 +352,10 @@ function lineCalc(line,departTs,dur,cf){if(cf===undefined)cf=1;
   var kmh=dur>0&&tot>0?tot/(dur/3600):50,t=departTs,gl=0,hi=0,st=[],cur=null,lv=[];
   for(i=0;i<line.length-1;i++){var a=line[i],b=line[i+1],km=distKm(a[1],a[0],b[1],b[0]);if(!km){lv.push(0);continue}
     var d=km/kmh*60,sp=sunPos(t+d*30000,(a[1]+b[1])/2,(a[0]+b[0])/2),brg=bearing(a[1],a[0],b[1],b[0]),l=level(glareDir(brg,sp.az,sp.alt)*cf);lv.push(l);
-    if(l>=2){gl+=d;if(l===3)hi+=d;var dn=dirName(brg);
-      if(cur&&cur.d===dn&&Math.abs(t-cur.t1)<1000){cur.t1=t+d*60000;cur.km+=km;cur.l=Math.max(cur.l,l)}else{cur={name:'',d:dn,t0:t,t1:t+d*60000,km:km,l:l};st.push(cur)}}
-    else cur=null;
+    if(l>=2){gl+=d;if(l===3)hi+=d;
+      if(cur&&t-cur.t1<=45000){cur.t1=t+d*60000;cur.km+=km;cur.l=Math.max(cur.l,l);cur.e=b}else{cur={name:'',s:a,e:b,t0:t,t1:t+d*60000,km:km,l:l};st.push(cur)}}
     t+=d*60000}
+  st=st.filter(function(x){return x.km>=0.2});st.forEach(function(x){x.d=dirName(bearing(x.s[1],x.s[0],x.e[1],x.e[0]))});
   return {km:tot,min:(t-departTs)/60000,gl:gl,hi:hi,st:st,lv:lv};
 }
 /*PURE-END*/
@@ -457,7 +459,7 @@ function update(){
   var V=el('verdict'),ic=el('vIcon');
   if(sun.alt>=-0.5&&sun.alt<25&&cf===0){V.className='verdict v-ok';ic.innerHTML=CLOUD;el('vMain').textContent='Cloudy, so no sun in drivers\u2019 eyes';el('vSub').textContent='Cloud cover is '+Math.round(cl)+'% at this hour.'}
   else if(sun.alt<-0.5){V.className='verdict v-night';ic.innerHTML='<path d="M30 6a18 18 0 1 0 12 30A15 15 0 0 1 30 6z" fill="currentColor"/>';el('vMain').textContent='The sun is down';el('vSub').textContent='No sun in anyone\u2019s eyes.'}
-  else if(hiN){V.className='verdict v-high';ic.innerHTML=SUN;el('vMain').textContent='Sun in drivers\u2019 eyes on '+hiN+(hiN===1?' road':' roads');el('vSub').textContent='Worst: '+arr[0].n+', driving '+dirName(arr[0].o.d)+'. Red roads on the map.'}
+  else if(hiN){V.className='verdict v-high';ic.innerHTML=SUN;el('vMain').textContent='Sun in drivers\u2019 eyes on '+hiN+(hiN===1?' road':' roads');el('vSub').textContent='Worst: '+arr[0].n+', driving '+dirName(arr[0].o.d)+'. Zoom in to see smaller roads.'}
   else if(medN){V.className='verdict v-med';ic.innerHTML=SUN;el('vMain').textContent='A little sun in drivers\u2019 eyes';el('vSub').textContent=medN+(medN===1?' road':' roads')+' affected. Orange on the map.'}
   else{V.className='verdict v-ok';ic.innerHTML=CHECK;el('vMain').textContent='Roads are fine right now';el('vSub').textContent=sun.alt>=25?'The sun is high in the sky.':'No road points at the sun.'}
   drawSky(min);
@@ -471,7 +473,7 @@ function drawSky(min){
   for(var m=riseMin;m<=setMin;m+=5){var p=pt(m);arc+=(arc?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);
     var a=day[m/5].alt;if(a<25){if(!cur){cur='';hot.push(0)}cur+=(cur?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);hot[hot.length-1]=cur}else cur=null}
   s+='<path class="arc" d="'+arc+'"/>'+hot.map(function(d){return '<path class="hot" d="'+d+'"/>'}).join('');
-  s+='<text x="8" y="59">'+hm(riseMin)+'</text><text x="312" y="59" text-anchor="end">'+hm(setMin)+'</text>';
+  el('lblRise').textContent='Sunrise '+hm(riseMin);el('lblSet').textContent='Sunset '+hm(setMin);
   if(min>=riseMin&&min<=setMin){var q=pt(min);s+='<circle class="sun" cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="8"/>'}
   el('sky').innerHTML=s;
 }
@@ -513,8 +515,9 @@ function render(){
   if(W&&view.k>1)drawTiles();
   ctx.lineCap='round';ctx.lineJoin='round';
   var cols=[css('--road'),css('--road'),css('--med'),css('--high')],wd=[roads.length>200?1:1.6,roads.length>200?1:1.6,2.6,3.4];
+  var lod=view.k>12000?0:view.k>3000?45:60;
   for(var l=0;l<4;l++){if(tiles.on&&l<2)continue;ctx.beginPath();var li=lvIdx[l];
-    for(var ii=0;ii<li.length;ii++){var s=segs[li[ii]],x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by);
+    for(var ii=0;ii<li.length;ii++){var s=segs[li[ii]];if(l>=2&&lod){var rd=roads[s.r];if(!rd.label&&(rd.kmh||35)<lod)continue}var x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by);
       if((x1<0&&x2<0)||(x1>W&&x2>W)||(y1<0&&y2<0)||(y1>H&&y2>H))continue;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)}
     ctx.strokeStyle=cols[l];ctx.globalCompositeOperation=tiles.on?'multiply':'source-over';
     if(l>=2&&!moving){ctx.lineWidth=wd[l]*2.8;ctx.globalAlpha=(trip.path||trip.line)?0.08:0.2;ctx.stroke()}
@@ -564,7 +567,7 @@ function setPick(m){pickMode=m;el('btnA').classList.toggle('on',m==='a');el('btn
 function solveTrip(){trip.line=null;trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==trip.b)?shortest(graph,trip.a,trip.b):null;showTrip();draw()}
 function showTrip(){
   var o=el('tripOut');el('btnClear').hidden=!(tripOn()||ends.a||ends.b||el('fromTxt').value||el('toTxt').value);
-  if(!tripOn()){o.innerHTML=(trip.a>=0&&trip.b>=0)?'<p class="small">No road path joins the two points on this map. Move one of them.</p>':'';return}
+  if(!tripOn()){o.innerHTML=(trip.a>=0&&trip.b>=0&&!el('btnGo').disabled)?'<p class="small">No road path joins the two points on this map. Move one of them.</p>':'';return}
   var calc=function(ts,m){var c=cfOf(cloudAt(m));return trip.line?lineCalc(trip.line,ts,trip.dur,c):tripCalc(trip.path,segs,roads,ts,center.lat,center.lng,c)};
   var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=calc(dep,min),cfNow=cfOf(cloudAt(min));trip.lv=r.lv;
   var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:calc(zoned(p[0],p[1],p[2],m),m).gl}}).filter(Boolean);
@@ -575,7 +578,7 @@ function showTrip(){
   var h='';
   if(best.gl<r.gl-1)h+='<button type="button" class="primary wide" data-m="'+best.m+'">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
   h+='<div><p class="small" style="margin-bottom:6px">Minutes with the sun in your eyes if you leave at</p><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+' · '+Math.round(x.gl)+'</button>'}).join('')+'</div></div>';
-  if(trip.line&&trip.A&&trip.A.name&&(trip.A.name!==MAPPT||trip.B.name!==MAPPT))h+='<p class="small">A: '+esc(trip.A.name)+'<br>B: '+esc(trip.B.name)+'<br>Wrong place? Add the city, state or ZIP code.</p>';
+  if(trip.line&&trip.A&&trip.A.name&&trip.A.name!==MAPPT&&trip.B.name!==MAPPT&&trip.A.name!==DEMO[0]&&trip.A.name!==DEMO[1])h+='<p class="small">A: '+esc(trip.A.name)+'<br>B: '+esc(trip.B.name)+'<br>Wrong place? Add the city, state or ZIP code.</p>';
   if(r.st.length)h+='<details><summary>Where it happens</summary><ul class="list">'+r.st.slice(0,8).map(function(s){return '<li><span>'+(s.name||(trip.line?'Your route':'Unnamed road'))+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul></details>';
   o.innerHTML=h;
 }
@@ -684,7 +687,7 @@ function geocode1(q){return geocodeSlow(q).catch(function(err){return geocodeFas
 function runTrip(){
   var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
   if(!f||!t){hint('Type both places, or tap a pin and then the map.');return}
-  var pa=(f===MAPPT&&ends.a)?ends.a:null,pb=(t===MAPPT&&ends.b)?ends.b:null;if(!pa)ends.a=null;if(!pb)ends.b=null;
+  var pa=(ends.a&&(f===MAPPT||f===ends.a.name))?ends.a:null,pb=(ends.b&&(t===MAPPT||t===ends.b.name))?ends.b:null;if(!pa)ends.a=null;if(!pb)ends.b=null;
   hint('Finding your trip…');el('btnGo').disabled=true;setPick(null);var A,B;
   var both=(pa&&pb)?Promise.resolve([pa,pb]):pa?geocode1(t).then(function(b){return [pa,b]}):pb?geocode1(f).then(function(a){return [a,pb]}):geocodeBoth(f,t);
   both.then(function(ab){A=ab[0];B=ab[1];hint('Finding the route…');
@@ -712,8 +715,9 @@ var CACHE='glare-roads-v1',METRO=[38.48,-90.62,38.80,-90.16];
 function pack(text){return {compact:1,text:text,roads:roads.map(function(r){var p=[];r.pts.forEach(function(c){p.push(+c[0].toFixed(5),+c[1].toFixed(5))});return [r.name,r.oneway?1:0,r.kmh||35,p]}),hazards:hazards.map(function(z){return [+z.lat.toFixed(5),+z.lng.toFixed(5),z.type]})}}
 function unpack(j){return {text:j.text||'',roads:j.roads.map(function(r){var p=[];for(var i=0;i<r[3].length;i+=2)p.push([r[3][i],r[3][i+1]]);return {name:r[0],oneway:!!r[1],kmh:r[2],pts:p}}),hazards:(j.hazards||[]).map(function(z){return {lat:z[0],lng:z[1],type:z[2]}})}}
 function parseAny(j){if(j.compact)return unpack(j);var d=j.elements?fromOverpass(j):fromGeo(j);d.text='';return d}
-function useData(d,text){var keep={cx:view.cx,cy:view.cy,k:view.k},hadLine=!!trip.line,hadDemo=!trip.line&&trip.path&&!pickMode&&!ends.a&&!ends.b&&el('fromTxt').value===DEMO[0];
-  setRoads(d.roads,d.hazards,text,true);if(!hadLine){view=keep;if(hadDemo)demoTrip()}draw()}
+function useData(d,text){var keep={cx:view.cx,cy:view.cy,k:view.k},hadLine=!!trip.line;
+  setRoads(d.roads,d.hazards,text,true);
+  if(!hadLine){view=keep;if(!ONLINE&&ends.a&&ends.b&&!pickMode){trip.a=near(ends.a.lat,ends.a.lng);trip.b=near(ends.b.lat,ends.b.lng);solveTrip()}}draw()}
 function autoLoad(){
   if(/claude/i.test(location.hostname)||location.protocol==='file:')return;
   fetch('roads.json',{cache:'no-cache'}).then(function(r){if(!r.ok)throw new Error('none');return r.json()}).then(function(j){var d=parseAny(j);if(!d.roads.length)throw new Error('empty');
@@ -730,8 +734,9 @@ el('btnSaveRoads').onclick=function(){
     say('Saved roads.json. Upload it to the same folder as this page and the roads will load instantly for everyone.')}catch(e){say('Saving is blocked here. Open the page in a browser and try again.')}};
 var BUILT='Showing a built-in sketch of '+BUILTIN.length+' main St. Louis roads with '+BN.hazards.length+' junctions between them. Positions are approximate and drawn by hand, so use real roads for any real check.';
 function near(la,lo){var b=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var d=distKm(la,lo,graph.nlat[i],graph.nlng[i]);if(d<bd){bd=d;b=i}}return b}
-var DEMO=['Downtown St. Louis, MO','Fenton, MO'];
-function demoTrip(){if(!el('fromTxt').value&&!el('toTxt').value){el('fromTxt').value=DEMO[0];el('toTxt').value=DEMO[1]}trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
+var DEMO=['Downtown St. Louis, MO','Fenton, MO'],DEMOPT=[{lat:38.627,lng:-90.199,name:DEMO[0]},{lat:38.513,lng:-90.436,name:DEMO[1]}],ONLINE=!(/claude/i.test(location.hostname)||location.protocol==='file:');
+function demoTrip(){if(!el('fromTxt').value&&!el('toTxt').value){el('fromTxt').value=DEMO[0];el('toTxt').value=DEMO[1]}ends.a=DEMOPT[0];ends.b=DEMOPT[1];
+  if(ONLINE)runTrip();else{trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}}
 el('btnA').onclick=function(){setPick(pickMode==='a'?null:'a')};
 el('btnB').onclick=function(){setPick(pickMode==='b'?null:'b')};
 el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null,line:null};ends={a:null,b:null};el('fromTxt').value='';el('toTxt').value='';setPick(null);update()};
