@@ -106,7 +106,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>St. Louis Sun Glare Map</h1>
+  <h1>St. Louis Sun Glare Map <span id="ver" style="font-weight:400;opacity:.7">· version 9</span></h1>
   <div class="verdict" id="verdict" aria-live="polite">
     <svg id="vIcon" viewBox="0 0 48 48" aria-hidden="true"></svg>
     <div><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
@@ -184,6 +184,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
         <button id="btnLive" type="button">Load real roads for this view</button>
         <label class="filebtn">Load a road file<input type="file" id="file" accept=".json,.geojson,application/json"></label>
         <button id="btnReset" type="button">Back to built-in roads</button>
+        <button id="btnSaveRoads" type="button">Save road file for this site</button>
       </div>
       <p class="small" id="msg" style="margin-top:8px"></p>
     </div>
@@ -576,10 +577,18 @@ el('btnLive').onclick=function(){
      var keep={cx:view.cx,cy:view.cy,k:view.k};setRoads(list,d.hazards,'Showing '+list.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for the view you chose'+(d.span>0.08?' (main roads only; zoom in for side streets).':'.'));view=keep;draw();say('')})
    .catch(function(err){say(liveWhy(err))});
 };
-function geocode(q){
+function geocodeSlow(q){
   var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
   var url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)+'&viewbox='+[w,inv(view.cy-H/2/view.k),e,inv(view.cy+H/2/view.k)].map(function(v){return v.toFixed(3)}).join(',');
   return fetch(url).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()}).then(function(j){if(!j.length)throw new Error('notfound:'+q);return {lat:+j[0].lat,lng:+j[0].lon}});
+}
+function geocodeFast(q){
+  return fetch('https://photon.komoot.io/api/?limit=1&lat='+center.lat.toFixed(3)+'&lon='+center.lng.toFixed(3)+'&q='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()})
+   .then(function(j){var f=j.features&&j.features[0];if(!f||!f.geometry)throw new Error('notfound:'+q);return {lat:+f.geometry.coordinates[1],lng:+f.geometry.coordinates[0]}});
+}
+function geocodeBoth(f,t){
+  return Promise.all([geocodeFast(f),geocodeFast(t)]).catch(function(){
+    var A;return geocodeSlow(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocodeSlow(t)}).then(function(b){return [A,b]})});
 }
 function wait(ms){return new Promise(function(ok){setTimeout(ok,ms)})}
 function hint(t){el('tripHint').textContent=t}
@@ -587,7 +596,7 @@ el('tripForm').addEventListener('submit',function(ev){
   ev.preventDefault();var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
   if(!f||!t){hint('Type both a From address and a To address.');return}
   hint('Finding the two addresses…');el('btnGo').disabled=true;var A,B;
-  geocode(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocode(t)}).then(function(b){B=b;hint('Finding the route…');
+  geocodeBoth(f,t).then(function(ab){A=ab[0];B=ab[1];hint('Finding the route…');
     return fetch('https://router.project-osrm.org/route/v1/driving/'+A.lng+','+A.lat+';'+B.lng+','+B.lat+'?overview=full&geometries=geojson').then(function(r){if(!r.ok)throw new Error('route');return r.json()})
      .then(function(j){var r=j.routes&&j.routes[0];if(!r||!r.geometry)throw new Error('route');return r},function(){return null})})
    .then(function(r){
@@ -606,6 +615,26 @@ el('tripForm').addEventListener('submit',function(ev){
      hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':(/claude/i.test(location.hostname)?'Address lookup is blocked inside Claude. Open the page from its own web link in a browser, or pick the points on the map.':'Address lookup did not work. Wait a minute and try again, or pick the points on the map.'))})
    .then(function(){el('btnGo').disabled=false});
 });
+var CACHE='glare-roads-v1',METRO=[38.48,-90.62,38.80,-90.16];
+function pack(text){return {compact:1,text:text,roads:roads.map(function(r){var p=[];r.pts.forEach(function(c){p.push(+c[0].toFixed(5),+c[1].toFixed(5))});return [r.name,r.oneway?1:0,r.kmh||35,p]}),hazards:hazards.map(function(z){return [+z.lat.toFixed(5),+z.lng.toFixed(5),z.type]})}}
+function unpack(j){return {text:j.text||'',roads:j.roads.map(function(r){var p=[];for(var i=0;i<r[3].length;i+=2)p.push([r[3][i],r[3][i+1]]);return {name:r[0],oneway:!!r[1],kmh:r[2],pts:p}}),hazards:(j.hazards||[]).map(function(z){return {lat:z[0],lng:z[1],type:z[2]}})}}
+function parseAny(j){if(j.compact)return unpack(j);var d=j.elements?fromOverpass(j):fromGeo(j);d.text='';return d}
+function useData(d,text){var keep={cx:view.cx,cy:view.cy,k:view.k},hadLine=!!trip.line,hadDemo=!trip.line&&trip.path&&!pickMode;
+  setRoads(d.roads,d.hazards,text,true);if(!hadLine){view=keep;if(hadDemo)demoTrip()}draw()}
+function autoLoad(){
+  if(/claude/i.test(location.hostname)||location.protocol==='file:')return;
+  fetch('roads.json',{cache:'no-cache'}).then(function(r){if(!r.ok)throw new Error('none');return r.json()}).then(function(j){var d=parseAny(j);if(!d.roads.length)throw new Error('empty');
+      useData(d,'Showing '+d.roads.length+' real roads stored with this site (OpenStreetMap).')})
+   .catch(function(){var c=null;try{var s=localStorage.getItem(CACHE);if(s)c=unpack(JSON.parse(s))}catch(e){}
+     if(c&&c.roads.length){useData(c,'Showing '+c.roads.length+' real roads saved on this phone from an earlier visit (OpenStreetMap).');return}
+     say('Loading real roads in the background. You can use the map meanwhile.');
+     liveLoad(METRO[0],METRO[1],METRO[2],METRO[3]).then(function(d){if(!d.roads.length)return;
+       useData(d,'Showing '+d.roads.length+' real main roads from OpenStreetMap.');say('');
+       try{var s=JSON.stringify(pack(''));if(s.length<4000000)localStorage.setItem(CACHE,s)}catch(e){}},function(err){say('Real roads did not load, so the map shows the built-in sketch. '+liveWhy(err))})});
+}
+el('btnSaveRoads').onclick=function(){
+  try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(pack(srcText))],{type:'application/json'}));a.download='roads.json';document.body.appendChild(a);a.click();a.remove();
+    say('Saved roads.json. Upload it to the same folder as this page and the roads will load instantly for everyone.')}catch(e){say('Saving is blocked here. Open the page in a browser and try again.')}};
 var BUILT='Showing a built-in sketch of '+BUILTIN.length+' main St. Louis roads with '+BN.hazards.length+' junctions between them. Positions are approximate and drawn by hand, so use real roads for any real check.';
 function near(la,lo){var b=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var d=distKm(la,lo,graph.nlat[i],graph.nlng[i]);if(d<bd){bd=d;b=i}}return b}
 function demoTrip(){trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
@@ -643,6 +672,7 @@ if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
 resize();setRoads(BN.roads,BN.hazards,BUILT);
 if(setMin!==null)setTime(setMin-40);
 demoTrip();
+autoLoad();
 </script>
 </body>
 </html>
