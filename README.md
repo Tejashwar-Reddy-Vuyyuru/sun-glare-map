@@ -1,17 +1,21 @@
-# St. Louis Sun Glare Map
+# Sun Glare Map
 
-A single-page web app that scores every road segment for low-sun glare at a chosen date and time, and checks a trip for the stretches where the driver faces the sun.
+A web app that shows where low sun shines into drivers' eyes, for any date and time, and checks a trip for the stretches where the driver faces the sun.
 
-Status: working prototype. The scoring has not yet been validated against crash records (see Roadmap).
+- Live app: https://tejashwar-reddy-vuyyuru.github.io/sun-glare-map/
+- Plugin demo: https://tejashwar-reddy-vuyyuru.github.io/sun-glare-map/demo.html
+
+Status: working prototype, first built for St. Louis. The scoring has not yet been validated against crash records (see Roadmap).
 
 ## What it does
 
-- Colours roads by glare risk for any date and time, with a slider to move through the day.
+- Type a From and a To address, or pick both on the map, and get the minutes of the trip spent driving into the sun.
+- Suggests a better leaving time within 30 minutes either way, and swaps From and To in one tap.
+- Colours roads by glare risk for any date and time, with a slider that moves the sun through the day.
 - Shows, for any road, which direction of travel faces the sun and the time windows when it happens.
-- Takes typed From and To addresses (in a normal browser), or points tapped on the map.
-- Checks a trip from A to B: distance, drive time, minutes driving into glare, and the stretches affected.
-- Compares departure times 15 and 30 minutes earlier and later.
 - Raises risk near traffic signals, junctions, pedestrian crossings and schools.
+- Draws on a standard street map, with glare lines blended so street names stay readable.
+- Ships as a plugin (`glare-layer.js`) that adds a "Sun glare" layer to Leaflet, MapLibre, Mapbox and Google maps.
 
 ## How the score works
 
@@ -20,15 +24,15 @@ Status: working prototype. The scoring has not yet been validated against crash 
 3. Glare score is 1.0 with the sun dead ahead and under 15° up, falling to 0 at the 30° and 25° limits.
 4. Risk = glare score x hazard boost: 1.6 at traffic signals, 1.5 at junctions between main roads, 1.4 at crossings and schools, 1.0 elsewhere.
 5. Levels: high at 0.6 or more, medium at 0.3 or more, low above 0.05.
-6. A trip follows the quickest path on the loaded roads. The sun position is recalculated as the trip progresses.
+6. A typed trip uses a public route service (OSRM); a trip picked on the map follows the quickest path on the loaded roads. The sun position is recalculated as the trip progresses.
 
 ## Running it
 
-Open `index.html` in a browser. No build step and no server.
+Open the live link, or open `index.html` from any web server. No build step.
 
-- The page opens with a built-in sketch of 24 main St. Louis roads. Their positions are hand-drawn and approximate, for demonstration only.
-- "Load real roads for this view" fetches roads, signals, crossings and schools from OpenStreetMap through the Overpass API. This needs a normal browser or a hosted copy such as GitHub Pages.
-- "Load a road file" accepts an Overpass JSON export or a GeoJSON file of road lines and hazard points.
+- The page opens at once on a built-in sketch of main St. Louis roads, then loads real roads from OpenStreetMap in the background and remembers them in the browser.
+- If a `roads.json` file sits next to `index.html`, roads load from it straight away. Create one with "Save road file for this site" under "More".
+- Address search uses Nominatim, routes use the public OSRM demo server, and the background map uses OpenStreetMap tiles. These are free public services meant for light use.
 
 ## Adding the layer to another map
 
@@ -90,7 +94,8 @@ The main page can also export the affected roads for one moment as KML (Google E
 - Clouds and wet-road reflection are ignored.
 - Road slope is ignored.
 - Times are US Central only.
-- Trip times use a fixed speed per road class, with no traffic.
+- Trip times come from the route service or a fixed speed per road class, with no live traffic.
+- A typed trip does not include the extra risk near signals and crossings.
 
 ## Prior work
 
