@@ -133,7 +133,7 @@ input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px s
 </head>
 <body>
 <div class="screen">
-  <h1>Sun Glare Map <span id="ver">· version 18</span></h1>
+  <h1>Sun Glare Map <span id="ver">· version 19</span></h1>
   <form id="tripForm" class="search">
     <div class="fields">
       <div class="field"><span class="dot a">A</span><input type="text" id="fromTxt" placeholder="From: address or place" aria-label="From" autocomplete="off"><button type="button" class="icon" id="btnA" aria-label="Pick the start on the map"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21s-6-5.6-6-10a6 6 0 0 1 12 0c0 4.4-6 10-6 10z"/><circle cx="12" cy="11" r="2"/></svg></button></div>
@@ -771,7 +771,6 @@ new MutationObserver(restyle).observe(document.documentElement,{attributes:true,
 if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
 resize();setRoads(BN.roads,BN.hazards,BUILT);
 if(setMin!==null)setTime(setMin-40);
-demoTrip();
 autoLoad();
 loadWx();
 </script>
