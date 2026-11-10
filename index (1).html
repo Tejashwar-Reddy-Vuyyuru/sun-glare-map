@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>St. Louis Sun Glare Map</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Semi+Condensed:wght@500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  /* layout: first screen is verdict + map + time; everything else sits below, folded */
+  --bg:#f2f5f9; --surface:#ffffff; --ink:#152033; --muted:#566378; --line:#d3dae4;
+  --accent:#0a4fb3; --mapbg:#e4eaf1; --road:#9eabba;
+  --low:#f2b705; --med:#f07d12; --high:#d62828; --ok:#1e8a4c;
+  --display:"Barlow Semi Condensed","Arial Narrow",Arial,sans-serif;
+  --body:"Barlow","Helvetica Neue",Arial,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme:dark;
+    --bg:#0e141c; --surface:#172130; --ink:#eaf0f7; --muted:#97a6ba; --line:#2a3748;
+    --accent:#74b0ff; --mapbg:#0a1017; --road:#465568;
+    --low:#f2c230; --med:#f58f35; --high:#ff5c54; --ok:#4fc07a;
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --bg:#0e141c; --surface:#172130; --ink:#eaf0f7; --muted:#97a6ba; --line:#2a3748;
+  --accent:#74b0ff; --mapbg:#0a1017; --road:#465568;
+  --low:#f2c230; --med:#f58f35; --high:#ff5c54; --ok:#4fc07a;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:17px;line-height:1.4;font-variant-numeric:tabular-nums}
+.screen{height:100%;min-height:560px;display:flex;flex-direction:column;gap:10px;padding:12px 16px;max-width:860px;margin:0 auto}
+.below{max-width:860px;margin:0 auto;padding:4px 16px 40px;display:flex;flex-direction:column;gap:14px}
+h1{font-family:var(--display);font-weight:600;font-size:17px;margin:0;color:var(--muted);letter-spacing:.01em}
+h2{font-family:var(--display);font-weight:600;font-size:22px;margin:0 0 6px;text-wrap:balance}
+p{margin:0}
+.verdict{display:flex;align-items:center;gap:12px;border-radius:14px;padding:12px 14px;background:var(--surface);border:1px solid var(--line)}
+.verdict svg{flex:none;width:44px;height:44px}
+.verdict .vm{font-family:var(--display);font-weight:600;font-size:24px;line-height:1.1;text-wrap:balance}
+.verdict .vs{font-size:15px;opacity:.9}
+.verdict.v-high{background:var(--high);border-color:var(--high);color:#fff}
+.verdict.v-med{background:var(--med);border-color:var(--med);color:#241400}
+.verdict.v-ok .vm{color:var(--ok)}
+.mapwrap{position:relative;flex:1;min-height:260px;border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--mapbg)}
+canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+.zoom{position:absolute;right:10px;top:10px;display:flex;flex-direction:column;gap:6px}
+.zoom button{width:44px;height:44px;padding:0;font-size:24px;line-height:1;background:var(--surface)}
+.legend{position:absolute;left:10px;bottom:10px;display:flex;flex-direction:column;gap:4px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 10px;font-size:14px}
+.key{display:inline-flex;align-items:center;gap:8px}
+.sw{display:inline-block;width:28px;border-radius:4px}
+#selCard{position:absolute;left:10px;right:10px;bottom:10px;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:12px 44px 12px 14px;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+#selCard[hidden],.legend[hidden]{display:none}
+#selClose{position:absolute;right:6px;top:6px;width:36px;height:36px;padding:0;border:0;background:none;font-size:22px;color:var(--muted)}
+.big{font-family:var(--display);font-weight:600;font-size:22px;line-height:1.15;text-wrap:balance}
+.timebar{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 14px 12px}
+.timetop{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.time{font-family:var(--display);font-weight:600;font-size:38px;line-height:1}
+#sky{width:100%;height:60px;display:block}
+#sky .base{stroke:var(--line);stroke-width:2}
+#sky .arc{fill:none;stroke:var(--line);stroke-width:3}
+#sky .hot{fill:none;stroke:var(--med);stroke-width:6;stroke-linecap:round}
+#sky .sun{fill:var(--low);stroke:var(--ink);stroke-width:1.5}
+#sky text{fill:var(--muted);font:500 12px var(--body)}
+input[type=range]{width:100%;accent-color:var(--accent);height:36px;margin:0}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.three{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;margin-top:6px}
+button,.filebtn{font:inherit;font-weight:600;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px 12px;cursor:pointer;min-height:48px}
+button:hover,.filebtn:hover{border-color:var(--accent)}
+button:focus-visible,input:focus-visible,summary:focus-visible,.filebtn:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+button.primary,button.on{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.three button{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;padding:8px 6px;font-size:15px}
+.three svg{width:26px;height:26px}
+#btnPlay{width:56px;font-size:22px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:14px}
+.addr{display:flex;flex-direction:column;gap:6px}
+.addr input{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:12px;padding:12px;min-height:48px;width:100%}
+.addr button{margin-top:6px;font-size:18px;min-height:56px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px}
+.two button{font-size:18px;min-height:56px}
+.small{font-size:15px;color:var(--muted)}
+.pill{display:inline-block;border-radius:999px;padding:2px 10px;font-size:13px;font-weight:600;color:#fff}
+.pill.high{background:var(--high)} .pill.med{background:var(--med);color:#241400} .pill.low,.pill.none{background:var(--road)}
+ul.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column}
+ul.list li{display:flex;justify-content:space-between;gap:10px;align-items:center;padding:9px 0;border-top:1px solid var(--line)}
+ul.list li:first-child{border-top:0}
+ul.list button{border:0;background:none;padding:0;min-height:0;text-align:left;color:var(--accent);font-weight:500}
+.cmp{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.cmp button{font-size:14px;padding:7px 10px;min-height:40px;font-weight:500}
+.cmp button.best{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+details{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:12px 14px}
+details details,.card details{border:0;padding:8px 0 0;background:none}
+summary{cursor:pointer;font-weight:600}
+details>*+*{margin-top:12px}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{border:1px solid var(--line);border-radius:999px;padding:5px 11px;font-size:14px;background:var(--bg)}
+input[type=date]{font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:8px 10px}
+.notes{margin:0;padding-left:18px;color:var(--muted);font-size:14px;display:flex;flex-direction:column;gap:4px;max-width:65ch}
+.filebtn{position:relative;display:inline-flex;align-items:center}
+.filebtn input{position:absolute;opacity:0;width:1px;height:1px}
+#msg{min-height:1.4em}
+@media (max-width:420px){.verdict .vm{font-size:21px}.time{font-size:32px}.legend{font-size:13px}}
+</style>
+</head>
+<body>
+<div class="screen">
+  <h1>St. Louis Sun Glare Map</h1>
+  <div class="verdict" id="verdict" aria-live="polite">
+    <svg id="vIcon" viewBox="0 0 48 48" aria-hidden="true"></svg>
+    <div><div class="vm" id="vMain">Checking the sun</div><div class="vs" id="vSub"></div></div>
+  </div>
+  <div class="mapwrap">
+    <canvas id="map" role="img" aria-label="Map. Red roads have the sun in drivers' eyes at the chosen time."></canvas>
+    <div class="zoom">
+      <button id="zin" type="button" aria-label="Zoom in">+</button>
+      <button id="zout" type="button" aria-label="Zoom out">−</button>
+    </div>
+    <div class="legend" id="legend">
+      <span class="key"><span class="sw" style="height:7px;background:var(--high)"></span>Sun in your eyes</span>
+      <span class="key"><span class="sw" style="height:5px;background:var(--med)"></span>A little sun</span>
+      <span class="key"><span class="sw" style="height:3px;background:var(--road)"></span>Fine</span>
+    </div>
+    <div id="selCard" hidden>
+      <button id="selClose" type="button" aria-label="Close">×</button>
+      <div class="small" id="selTitle"></div>
+      <div id="selBody"></div>
+    </div>
+  </div>
+  <div class="timebar">
+    <div class="timetop">
+      <div class="time" id="timeText">4:15 pm</div>
+      <div class="small">Drag to move the sun</div>
+    </div>
+    <svg id="sky" viewBox="0 0 320 60" preserveAspectRatio="none" aria-hidden="true"></svg>
+    <input type="range" id="time" min="0" max="1435" step="5" value="975" aria-label="Time of day, US Central">
+    <div class="three">
+      <button id="btnAm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 4v5M9 6l3-3 3 3"/></svg>Morning</button>
+      <button id="btnNow" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l3 2"/></svg>Now</button>
+      <button id="btnPm" type="button"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M3 18h18M7 18a5 5 0 0 1 10 0M12 3v5M9 6l3 3 3-3"/></svg>Evening</button>
+      <button id="btnPlay" type="button" class="primary" aria-label="Play the day">▶</button>
+    </div>
+  </div>
+</div>
+
+<div class="below">
+  <section class="card">
+    <h2>My trip</h2>
+    <form id="tripForm" class="addr">
+      <label for="fromTxt" class="small">From</label>
+      <input type="text" id="fromTxt" autocomplete="street-address" placeholder="100 N Kirkwood Rd, Kirkwood MO">
+      <label for="toTxt" class="small">To</label>
+      <input type="text" id="toTxt" placeholder="1 N Grand Blvd, St. Louis MO">
+      <button id="btnGo" type="submit" class="primary">Check my trip</button>
+    </form>
+    <p class="small" id="tripHint" style="margin-top:12px">Or pick on the map: tap Start, then tap the map. Do the same for End.</p>
+    <div class="two">
+      <button id="btnA" type="button">Start (A)</button>
+      <button id="btnB" type="button">End (B)</button>
+    </div>
+    <div id="tripOut" style="margin-top:12px"></div>
+    <button id="btnClear" type="button" style="margin-top:10px;min-height:40px;padding:8px 12px;font-weight:500">Clear trip</button>
+  </section>
+
+  <details id="more">
+    <summary>More: date, worst roads, real map data, export, how it works</summary>
+    <div class="row"><label for="date" class="small">Date</label><input type="date" id="date"></div>
+    <div class="chips">
+      <span class="chip">Sun height <b id="cAlt">–</b></span>
+      <span class="chip">Sun direction <b id="cAz">–</b></span>
+      <span class="chip">Sunrise <b id="cRise">–</b></span>
+      <span class="chip">Sunset <b id="cSet">–</b></span>
+      <span class="chip">Strong glare on <b id="cKm">–</b></span>
+    </div>
+    <div>
+      <h2>Worst roads at this time</h2>
+      <ul class="list" id="worst"></ul>
+    </div>
+    <div>
+      <h2>Road data</h2>
+      <p class="small" id="src"></p>
+      <div class="row" style="margin-top:10px">
+        <button id="btnLive" type="button">Load real roads for this view</button>
+        <label class="filebtn">Load a road file<input type="file" id="file" accept=".json,.geojson,application/json"></label>
+        <button id="btnReset" type="button">Back to built-in roads</button>
+      </div>
+      <p class="small" id="msg" style="margin-top:8px"></p>
+    </div>
+    <div>
+      <h2>Use this layer in another map</h2>
+      <p class="small">Saves the red and orange roads for the time on the slider. KML opens in Google Earth and Google My Maps. GeoJSON is for developers.</p>
+      <div class="row" style="margin-top:10px">
+        <button id="btnKml" type="button">Save KML file</button>
+        <button id="btnCopyKml" type="button">Copy KML</button>
+        <button id="btnCopyGeo" type="button">Copy GeoJSON</button>
+      </div>
+      <p class="small" id="expMsg" style="margin-top:8px;min-height:1.4em"></p>
+    </div>
+    <div>
+      <h2>How the score works</h2>
+      <ul class="notes">
+        <li>Glare counts when the sun is between the horizon and 25° up, and within 30° left or right of the direction of travel.</li>
+        <li>The score is highest when the sun is dead ahead and under 15° up, where a visor cannot block it.</li>
+        <li>Both directions of a two-way road are checked. One-way roads are checked in their direction only.</li>
+        <li>Risk is the glare score raised near places where a driver must see clearly: 60% higher at traffic signals, 50% at junctions between main roads, 40% at crossings and schools. Small rings mark them when you zoom in.</li>
+        <li>A trip follows the quickest path on the loaded roads, and the sun moves as the trip goes on.</li>
+        <li>Not included yet: hills, buildings and trees that block the sun, clouds, and wet-road reflection.</li>
+        <li>Times are US Central. The sun position is calculated for the middle of the loaded roads.</li>
+      </ul>
+    </div>
+  </details>
+</div>
+
+<script>
+/*PURE-START*/
+var RAD=Math.PI/180;
+function sunPos(ts,lat,lng){
+  var d=ts/86400000-0.5+2440588-2451545;
+  var M=RAD*(357.5291+0.98560028*d);
+  var C=RAD*(1.9148*Math.sin(M)+0.02*Math.sin(2*M)+0.0003*Math.sin(3*M));
+  var L=M+C+RAD*102.9372+Math.PI, e=RAD*23.4397;
+  var dec=Math.asin(Math.sin(e)*Math.sin(L));
+  var ra=Math.atan2(Math.sin(L)*Math.cos(e),Math.cos(L));
+  var phi=RAD*lat, th=RAD*(280.16+360.9856235*d)+RAD*lng, H=th-ra;
+  var az=Math.atan2(Math.sin(H),Math.cos(H)*Math.sin(phi)-Math.tan(dec)*Math.cos(phi));
+  var alt=Math.asin(Math.sin(phi)*Math.sin(dec)+Math.cos(phi)*Math.cos(dec)*Math.cos(H));
+  return {az:((az/RAD+180)%360+360)%360, alt:alt/RAD};
+}
+function angDiff(a,b){var d=Math.abs(a-b)%360;return d>180?360-d:d}
+function glareDir(brg,az,alt){
+  if(alt<=-0.5||alt>=25)return 0;
+  var d=angDiff(brg,az); if(d>=30)return 0;
+  var f=alt<0?0.6:(alt<=15?1:(25-alt)/10);
+  return f*(1-d/30);
+}
+function glareSeg(brg,oneway,az,alt){
+  var a=glareDir(brg,az,alt), b=oneway?0:glareDir((brg+180)%360,az,alt);
+  return a>=b?{s:a,brg:brg}:{s:b,brg:(brg+180)%360};
+}
+function bearing(la1,lo1,la2,lo2){
+  var p1=la1*RAD,p2=la2*RAD,dl=(lo2-lo1)*RAD;
+  var y=Math.sin(dl)*Math.cos(p2), x=Math.cos(p1)*Math.sin(p2)-Math.sin(p1)*Math.cos(p2)*Math.cos(dl);
+  return (Math.atan2(y,x)/RAD+360)%360;
+}
+function distKm(la1,lo1,la2,lo2){
+  var a=Math.sin((la2-la1)*RAD/2),b=Math.sin((lo2-lo1)*RAD/2);
+  var h=a*a+Math.cos(la1*RAD)*Math.cos(la2*RAD)*b*b;
+  return 12742*Math.asin(Math.sqrt(h));
+}
+var DIRS=['north','north-east','east','south-east','south','south-west','west','north-west'];
+function dirName(b){return DIRS[Math.round(b/45)%8]}
+function level(s){return s>=0.6?3:s>=0.3?2:s>0.05?1:0}
+
+var KMH={motorway:100,motorway_link:60,trunk:80,trunk_link:50,primary:60,secondary:50,tertiary:45};
+function key(la,lo){return la.toFixed(5)+','+lo.toFixed(5)}
+function nodeRoads(list){
+  var out=list.map(function(r){return {name:r.name,oneway:r.oneway,label:r.label,kmh:r.kmh,pts:r.pts.map(function(p){return [p[0],p[1]]})}});
+  var ins=out.map(function(){return []}),junc={};
+  for(var i=0;i<out.length;i++)for(var j=i+1;j<out.length;j++){
+    var A=out[i].pts,B=out[j].pts;
+    for(var a=0;a<A.length-1;a++)for(var b=0;b<B.length-1;b++){
+      var p=A[a],q=A[a+1],c=B[b],d=B[b+1];
+      var rx=q[1]-p[1],ry=q[0]-p[0],sx_=d[1]-c[1],sy_=d[0]-c[0],den=rx*sy_-ry*sx_;
+      if(Math.abs(den)<1e-12)continue;
+      var t=((c[1]-p[1])*sy_-(c[0]-p[0])*sx_)/den,u=((c[1]-p[1])*ry-(c[0]-p[0])*rx)/den;
+      if(t<-1e-9||t>1+1e-9||u<-1e-9||u>1+1e-9)continue;
+      var e=1e-6,pt;
+      if(t<e)pt=p;else if(t>1-e)pt=q;else if(u<e)pt=c;else if(u>1-e)pt=d;
+      else pt=[+(p[0]+t*ry).toFixed(5),+(p[1]+t*rx).toFixed(5)];
+      if(t>e&&t<1-e)ins[i].push({s:a,t:t,pt:pt});
+      if(u>e&&u<1-e)ins[j].push({s:b,t:u,pt:pt});
+      junc[key(pt[0],pt[1])]=pt;
+    }
+  }
+  out.forEach(function(r,i){ins[i].sort(function(x,y){return y.s-x.s||y.t-x.t});ins[i].forEach(function(n){r.pts.splice(n.s+1,0,n.pt)})});
+  var seen={};
+  out.forEach(function(r,i){r.pts.forEach(function(p){var k=key(p[0],p[1]);if(seen[k]!==undefined&&seen[k]!==i)junc[k]=p;if(seen[k]===undefined)seen[k]=i})});
+  out.forEach(function(r){var np=[r.pts[0]];for(var i=1;i<r.pts.length;i++){var a=r.pts[i-1],b=r.pts[i],n=Math.ceil(distKm(a[0],a[1],b[0],b[1])/0.4);
+    for(var k=1;k<n;k++)np.push([+(a[0]+(b[0]-a[0])*k/n).toFixed(5),+(a[1]+(b[1]-a[1])*k/n).toFixed(5)]);np.push(b)}r.pts=np});
+  return {roads:out,hazards:Object.keys(junc).map(function(k){return {lat:junc[k][0],lng:junc[k][1],type:'junction'}})};
+}
+function makeSegs(roads){var segs=[];roads.forEach(function(r,ri){for(var i=0;i<r.pts.length-1;i++){var a=r.pts[i],b=r.pts[i+1];if(a[0]===b[0]&&a[1]===b[1])continue;
+  segs.push({r:ri,la1:a[0],lo1:a[1],la2:b[0],lo2:b[1],brg:bearing(a[0],a[1],b[0],b[1]),km:distKm(a[0],a[1],b[0],b[1]),w:1,why:'',s:0,g:0,d:0,l:0})}});return segs}
+var HZ={signal:{b:0.6,m:45,n:'a traffic signal'},junction:{b:0.5,m:250,n:'a junction between main roads'},crossing:{b:0.4,m:35,n:'a pedestrian crossing'},school:{b:0.4,m:150,n:'a school'}};
+function applyWeights(segs,hazards){
+  var C=0.003,grid={};
+  hazards.forEach(function(h){var k=Math.floor(h.lat/C)+','+Math.floor(h.lng/C);(grid[k]||(grid[k]=[])).push(h)});
+  segs.forEach(function(s){s.w=1;s.why='';if(!hazards.length)return;var n=Math.max(1,Math.ceil(s.km/0.03)),best=0;
+    for(var i=0;i<=n;i++){var la=s.la1+(s.la2-s.la1)*i/n,lo=s.lo1+(s.lo2-s.lo1)*i/n,gy=Math.floor(la/C),gx=Math.floor(lo/C);
+      for(var dy=-1;dy<=1;dy++)for(var dx=-1;dx<=1;dx++){var cell=grid[(gy+dy)+','+(gx+dx)];if(!cell)continue;
+        for(var j=0;j<cell.length;j++){var h=cell[j],z=HZ[h.type];if(z.b<=best)continue;
+          var my_=(h.lat-la)*111320,mx_=(h.lng-lo)*111320*Math.cos(la*RAD);if(mx_*mx_+my_*my_<=z.m*z.m){best=z.b;s.why=z.n}}}}
+    s.w=1+best});
+}
+function buildGraph(segs,roads){var idx={},nlat=[],nlng=[],adj=[];
+  function nid(la,lo){var k=key(la,lo);if(idx[k]===undefined){idx[k]=nlat.length;nlat.push(la);nlng.push(lo);adj.push([])}return idx[k]}
+  segs.forEach(function(s,i){var a=nid(s.la1,s.lo1),b=nid(s.la2,s.lo2),c=s.km/roads[s.r].kmh;adj[a].push({to:b,i:i,f:true,c:c});if(!roads[s.r].oneway)adj[b].push({to:a,i:i,f:false,c:c})});
+  return {nlat:nlat,nlng:nlng,adj:adj}}
+function shortest(g,a,b){
+  var n=g.adj.length,dist=new Float64Array(n).fill(Infinity),prev=new Int32Array(n).fill(-1),pe=new Array(n),heap=[[0,a]];dist[a]=0;
+  while(heap.length){
+    var top=heap[0],last=heap.pop();
+    if(heap.length){heap[0]=last;var i=0;for(;;){var l=2*i+1,r=l+1,m=i;if(l<heap.length&&heap[l][0]<heap[m][0])m=l;if(r<heap.length&&heap[r][0]<heap[m][0])m=r;if(m===i)break;var tmp=heap[i];heap[i]=heap[m];heap[m]=tmp;i=m}}
+    var c=top[0],u=top[1];if(c>dist[u])continue;if(u===b)break;
+    var es=g.adj[u];for(var k=0;k<es.length;k++){var e=es[k],nc=c+e.c;if(nc<dist[e.to]){dist[e.to]=nc;prev[e.to]=u;pe[e.to]=e;heap.push([nc,e.to]);
+      var q=heap.length-1;while(q>0){var p=(q-1)>>1;if(heap[p][0]<=heap[q][0])break;var t2=heap[p];heap[p]=heap[q];heap[q]=t2;q=p}}}
+  }
+  if(dist[b]===Infinity)return null;var path=[];for(var v=b;v!==a;v=prev[v])path.push({i:pe[v].i,f:pe[v].f});return path.reverse();
+}
+function tripCalc(path,segs,roads,departTs,lat,lng){
+  var t=departTs,gl=0,hi=0,km=0,st=[],cur=null;
+  path.forEach(function(p){var s=segs[p.i],r=roads[s.r],dur=s.km/r.kmh*60,sp=sunPos(t+dur*30000,lat,lng),b=p.f?s.brg:(s.brg+180)%360,l=level(glareDir(b,sp.az,sp.alt)*s.w);
+    km+=s.km;
+    if(l>=2){gl+=dur;if(l===3)hi+=dur;
+      if(cur&&cur.r===s.r&&Math.abs(t-cur.t1)<1000){cur.t1=t+dur*60000;cur.km+=s.km;cur.l=Math.max(cur.l,l)}
+      else{cur={r:s.r,name:r.name,d:dirName(b),t0:t,t1:t+dur*60000,km:s.km,l:l};st.push(cur)}}
+    else cur=null;
+    t+=dur*60000});
+  return {km:km,min:(t-departTs)/60000,gl:gl,hi:hi,st:st};
+}
+/*PURE-END*/
+
+var TZ='America/Chicago';
+var BUILTIN=[
+ ['I-64 / US-40',[[38.618,-90.184],[38.6215,-90.2],[38.63,-90.235],[38.632,-90.262],[38.631,-90.285],[38.634,-90.305],[38.636,-90.335],[38.637,-90.37],[38.638,-90.405],[38.636,-90.447],[38.648,-90.51],[38.666,-90.6]]],
+ ['I-44',[[38.615,-90.2],[38.612,-90.235],[38.611,-90.262],[38.605,-90.29],[38.598,-90.32],[38.583,-90.36],[38.565,-90.405],[38.553,-90.447],[38.535,-90.49],[38.512,-90.56]]],
+ ['I-70',[[38.635,-90.185],[38.665,-90.2],[38.69,-90.235],[38.705,-90.27],[38.722,-90.3],[38.727,-90.325],[38.745,-90.36],[38.752,-90.42],[38.76,-90.44],[38.775,-90.5]]],
+ ['I-55',[[38.61,-90.2],[38.585,-90.225],[38.56,-90.255],[38.535,-90.285],[38.51,-90.32],[38.503,-90.335],[38.47,-90.37]]],
+ ['I-270',[[38.503,-90.335],[38.515,-90.39],[38.553,-90.447],[38.6,-90.45],[38.636,-90.447],[38.68,-90.44],[38.72,-90.445],[38.76,-90.44],[38.775,-90.4],[38.775,-90.33],[38.77,-90.25],[38.765,-90.19]]],
+ ['I-170',[[38.636,-90.335],[38.66,-90.345],[38.7,-90.335],[38.727,-90.325],[38.77,-90.335]]],
+ ['Kingshighway Blvd',[[38.58,-90.263],[38.611,-90.262],[38.632,-90.262],[38.68,-90.262]]],
+ ['Grand Blvd',[[38.57,-90.243],[38.612,-90.239],[38.63,-90.234],[38.66,-90.225]]],
+ ['Hampton Ave',[[38.57,-90.292],[38.605,-90.292],[38.631,-90.292]]],
+ ['Lindbergh Blvd',[[38.52,-90.375],[38.555,-90.4],[38.565,-90.405],[38.583,-90.406],[38.601,-90.406],[38.63,-90.406],[38.7,-90.405],[38.745,-90.39],[38.79,-90.35]]],
+ ['Manchester Rd',[[38.626,-90.25],[38.613,-90.31],[38.607,-90.36],[38.601,-90.406],[38.594,-90.447],[38.593,-90.5],[38.592,-90.56]]],
+ ['Gravois Rd',[[38.61,-90.21],[38.59,-90.25],[38.565,-90.29],[38.55,-90.33],[38.53,-90.385]]],
+ ['Page Ave',[[38.66,-90.25],[38.675,-90.33],[38.69,-90.4],[38.7,-90.45],[38.715,-90.5]]],
+ ['Olive Blvd',[[38.64,-90.2],[38.657,-90.3],[38.672,-90.36],[38.675,-90.44],[38.668,-90.5]]],
+ ['Clayton Rd',[[38.633,-90.305],[38.632,-90.36],[38.63,-90.406],[38.62,-90.45],[38.605,-90.52]]],
+ ['Watson Rd',[[38.593,-90.29],[38.575,-90.34],[38.562,-90.38],[38.555,-90.4]]],
+ ['MO-141',[[38.535,-90.49],[38.593,-90.505],[38.65,-90.51],[38.7,-90.5]]],
+ ['Delmar Blvd',[[38.647,-90.2],[38.652,-90.3],[38.656,-90.335]]],
+ ['Chippewa St',[[38.59,-90.23],[38.59,-90.262],[38.593,-90.29]]],
+ ['Big Bend Blvd',[[38.635,-90.31],[38.61,-90.325],[38.59,-90.35],[38.575,-90.39],[38.57,-90.43],[38.565,-90.48]]],
+ ['Adams Ave (Kirkwood)',[[38.583,-90.43],[38.583,-90.406],[38.583,-90.38]]],
+ ['Geyer Rd (Kirkwood)',[[38.56,-90.42],[38.583,-90.42],[38.601,-90.42]]],
+ ['Natural Bridge Rd',[[38.672,-90.215],[38.69,-90.26],[38.705,-90.3],[38.725,-90.345]]],
+ ['Broadway',[[38.56,-90.235],[38.6,-90.2],[38.63,-90.186],[38.68,-90.2]]]
+].map(function(r){return {name:r[0],oneway:false,pts:r[1],label:true,kmh:/^I-/.test(r[0])?100:r[0]==='MO-141'?80:55}});
+var BN=nodeRoads(BUILTIN);
+
+var cv=document.getElementById('map'),ctx=cv.getContext('2d');
+var roads=[],segs=[],center={lat:38.62,lng:-90.33},view={cx:0,cy:0,k:1},W=0,H=0,dpr=1;
+var day=[],riseMin=null,setMin=null,sun={az:0,alt:0},selected=-1,playing=null,srcText='';
+var hazards=[],graph=null,trip={a:-1,b:-1,path:null},pickMode=null;
+var tfmt=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hour:'numeric',minute:'2-digit'});
+function clock(ts){return tfmt.format(new Date(ts)).toLowerCase()}
+var el=function(id){return document.getElementById(id)};
+function my(lat){return -Math.log(Math.tan(Math.PI/4+lat*RAD/2))/RAD}
+var fmt=new Intl.DateTimeFormat('en-US',{timeZone:TZ,hourCycle:'h23',year:'numeric',month:'numeric',day:'numeric',hour:'numeric',minute:'numeric',second:'numeric'});
+function offMin(ts){var o={};fmt.formatToParts(new Date(ts)).forEach(function(p){o[p.type]=+p.value});return (Date.UTC(o.year,o.month-1,o.day,o.hour,o.minute,o.second)-Math.floor(ts/1000)*1000)/60000}
+function zoned(y,m,d,min){var base=Date.UTC(y,m-1,d,0,min);var g=base-offMin(base)*60000;return base-offMin(g)*60000}
+function hm(min){var h=Math.floor(min/60),m=min%60,ap=h<12?'am':'pm';h=h%12||12;return h+':'+(m<10?'0':'')+m+' '+ap}
+function dateParts(){var v=el('date').value.split('-');return [+v[0],+v[1],+v[2]]}
+
+function setRoads(list,hz,text){
+  roads=list;hazards=hz||[];segs=makeSegs(list);var sl=0,sn=0;
+  segs.forEach(function(s){s.ax=s.lo1;s.ay=my(s.la1);s.bx=s.lo2;s.by=my(s.la2);sl+=s.la1+s.la2;sn+=s.lo1+s.lo2});
+  if(segs.length){center={lat:sl/segs.length/2,lng:sn/segs.length/2}}
+  applyWeights(segs,hazards);graph=buildGraph(segs,roads);trip={a:-1,b:-1,path:null};
+  srcText=text;el('src').textContent=text;selected=-1;showSel();fit();buildDay();update();
+}
+function fit(){
+  if(!segs.length)return;var x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;
+  segs.forEach(function(s){x0=Math.min(x0,s.ax,s.bx);x1=Math.max(x1,s.ax,s.bx);y0=Math.min(y0,s.ay,s.by);y1=Math.max(y1,s.ay,s.by)});
+  view.cx=(x0+x1)/2;view.cy=(y0+y1)/2;view.k=Math.min(W/Math.max(x1-x0,1e-6),H/Math.max(y1-y0,1e-6))*0.9;
+}
+function buildDay(){
+  var p=dateParts();day=[];riseMin=null;setMin=null;
+  for(var m=0;m<1440;m+=5){var s=sunPos(zoned(p[0],p[1],p[2],m),center.lat,center.lng);day.push(s);
+    if(s.alt>-0.83){if(riseMin===null)riseMin=m;setMin=m}}
+  el('cRise').textContent=riseMin===null?'–':hm(riseMin);el('cSet').textContent=setMin===null?'–':hm(setMin);
+}
+function update(){
+  var min=+el('time').value,p=dateParts();
+  sun=sunPos(zoned(p[0],p[1],p[2],min),center.lat,center.lng);
+  el('timeText').textContent=hm(min);
+  el('cAlt').textContent=sun.alt<-0.83?'below horizon':sun.alt.toFixed(1)+'°';
+  el('cAz').textContent=dirName(sun.az)+' ('+Math.round(sun.az)+'°)';
+  var km=0,by={};
+  for(var i=0;i<segs.length;i++){var s=segs[i],g=glareSeg(s.brg,roads[s.r].oneway,sun.az,sun.alt);s.s=g.s;s.g=g.s*s.w;s.d=g.brg;s.l=level(s.g);
+    if(s.l===3)km+=s.km;
+    if(s.l>=2){var nm=roads[s.r].name;if(nm){var o=by[nm]||(by[nm]={w:0,km:0,top:0,d:g.brg,i:i});o.w+=s.km*s.g;o.km+=s.km;if(s.g>o.top){o.top=s.g;o.d=g.brg;o.i=i}}}}
+  el('cKm').textContent=km.toFixed(1)+' km';
+  var arr=Object.keys(by).map(function(k){return {n:k,o:by[k]}}).sort(function(a,b){return b.o.w-a.o.w}).slice(0,6);
+  var ul=el('worst');ul.textContent='';
+  if(!arr.length){var li=document.createElement('li');li.className='small';li.textContent=sun.alt<-0.5?'The sun is down, so there is no glare.':sun.alt>=25?'The sun is too high to shine into drivers’ eyes.':'No road lines up with the sun right now.';ul.appendChild(li)}
+  arr.forEach(function(a){var li=document.createElement('li'),b=document.createElement('button'),r=document.createElement('span'),lv=level(a.o.top);
+    b.type='button';b.textContent=a.n+', driving '+dirName(a.o.d);b.onclick=function(){selected=a.o.i;showSel();draw()};
+    r.innerHTML='<span class="small">'+a.o.km.toFixed(1)+' km </span><span class="pill '+(lv===3?'high':'med')+'">'+(lv===3?'Strong':'A little')+'</span>';
+    li.appendChild(b);li.appendChild(r);ul.appendChild(li)});
+  var hiN=0,medN=0;Object.keys(by).forEach(function(k){if(level(by[k].top)===3)hiN++;else medN++});
+  var V=el('verdict'),ic=el('vIcon'),SUN='<circle cx="24" cy="24" r="9" fill="currentColor"/><g stroke="currentColor" stroke-width="3" stroke-linecap="round"><path d="M24 4v6M24 38v6M4 24h6M38 24h6M10 10l4 4M34 34l4 4M10 38l4-4M34 14l4-4"/></g>';
+  if(sun.alt<-0.5){V.className='verdict v-night';ic.innerHTML='<path d="M30 6a18 18 0 1 0 12 30A15 15 0 0 1 30 6z" fill="currentColor"/>';el('vMain').textContent='The sun is down';el('vSub').textContent='No sun in anyone\u2019s eyes.'}
+  else if(hiN){V.className='verdict v-high';ic.innerHTML=SUN;el('vMain').textContent='Sun in drivers\u2019 eyes on '+hiN+(hiN===1?' road':' roads');el('vSub').textContent='Worst: '+arr[0].n+', driving '+dirName(arr[0].o.d)+'. Red roads on the map.'}
+  else if(medN){V.className='verdict v-med';ic.innerHTML=SUN;el('vMain').textContent='A little sun in drivers\u2019 eyes';el('vSub').textContent=medN+(medN===1?' road':' roads')+' affected. Orange on the map.'}
+  else{V.className='verdict v-ok';ic.innerHTML='<circle cx="24" cy="24" r="20" fill="none" stroke="currentColor" stroke-width="4"/><path d="M14 25l7 7 13-15" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>';el('vMain').textContent='Roads are fine right now';el('vSub').textContent=sun.alt>=25?'The sun is high in the sky.':'No road points at the sun.'}
+  drawSky(min);
+  if(selected>=0)showSel();showTrip();draw();
+}
+function drawSky(min){
+  var s='<line class="base" x1="8" y1="50" x2="312" y2="50"/>';
+  if(riseMin===null||setMin===null||setMin<=riseMin){el('sky').innerHTML=s;return}
+  var pt=function(m){var f=(m-riseMin)/(setMin-riseMin);return [20+280*f,(1-f)*(1-f)*50+2*f*(1-f)*(-30)+f*f*50]};
+  var arc='',hot=[],cur=null;
+  for(var m=riseMin;m<=setMin;m+=5){var p=pt(m);arc+=(arc?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);
+    var a=day[m/5].alt;if(a<25){if(!cur){cur='';hot.push(0)}cur+=(cur?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1);hot[hot.length-1]=cur}else cur=null}
+  s+='<path class="arc" d="'+arc+'"/>'+hot.map(function(d){return '<path class="hot" d="'+d+'"/>'}).join('');
+  s+='<text x="8" y="59">'+hm(riseMin)+'</text><text x="312" y="59" text-anchor="end">'+hm(setMin)+'</text>';
+  if(min>=riseMin&&min<=setMin){var q=pt(min);s+='<circle class="sun" cx="'+q[0].toFixed(1)+'" cy="'+q[1].toFixed(1)+'" r="8"/>'}
+  el('sky').innerHTML=s;
+}
+function showSel(){
+  var card=el('selCard');
+  if(selected<0||!segs[selected]){card.hidden=true;el('legend').hidden=false;return}
+  card.hidden=false;el('legend').hidden=true;
+  var s=segs[selected],r=roads[s.r];
+  el('selTitle').textContent=r.name||'This road';
+  var wins=[],cur=null;
+  for(var i=0;i<day.length;i++){var g=glareSeg(s.brg,r.oneway,day[i].az,day[i].alt);
+    if(g.s*s.w>=0.3){if(cur&&cur.d===dirName(g.brg))cur.b=i*5+5;else{cur={a:i*5,b:i*5+5,d:dirName(g.brg)};wins.push(cur)}}else cur=null}
+  var h=s.l>=2?'<p class="big">'+(s.l===3?'Sun in your eyes':'A little sun in your eyes')+' driving '+dirName(s.d)+'</p>':'<p class="big">Fine right now</p>';
+  h+='<p class="small" style="margin-top:4px">'+(wins.length?'Today: '+wins.map(function(w){return '<b>'+hm(w.a)+' to '+hm(Math.min(w.b,1439))+'</b> driving '+w.d}).join(', ')+'.':'No sun in your eyes here today.')+(s.why?' Extra care: '+s.why+' is close by.':'')+'</p>';
+  el('selBody').innerHTML=h;
+}
+function css(n){return getComputedStyle(document.documentElement).getPropertyValue(n).trim()}
+function sx(x){return (x-view.cx)*view.k+W/2} function sy(y){return (y-view.cy)*view.k+H/2}
+function draw(){
+  ctx.setTransform(dpr,0,0,dpr,0,0);ctx.fillStyle=css('--mapbg');ctx.fillRect(0,0,W,H);
+  ctx.lineCap='round';ctx.lineJoin='round';
+  if(trip.path){ctx.beginPath();trip.path.forEach(function(p){var s=segs[p.i];ctx.moveTo(sx(s.ax),sy(s.ay));ctx.lineTo(sx(s.bx),sy(s.by))});ctx.strokeStyle=css('--accent');ctx.lineWidth=14;ctx.globalAlpha=0.3;ctx.stroke();ctx.globalAlpha=1}
+  var cols=[css('--road'),css('--road'),css('--med'),css('--high')],wd=[roads.length>200?1.2:2.2,roads.length>200?1.2:2.2,5,7.5];
+  for(var l=0;l<4;l++){ctx.beginPath();
+    for(var i=0;i<segs.length;i++){var s=segs[i];if(s.l!==l)continue;var x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by);
+      if((x1<0&&x2<0)||(x1>W&&x2>W)||(y1<0&&y2<0)||(y1>H&&y2>H))continue;ctx.moveTo(x1,y1);ctx.lineTo(x2,y2)}
+    ctx.strokeStyle=cols[l];ctx.lineWidth=wd[l];ctx.stroke()}
+  if(selected>=0&&segs[selected]){var q=segs[selected];ctx.beginPath();ctx.moveTo(sx(q.ax),sy(q.ay));ctx.lineTo(sx(q.bx),sy(q.by));ctx.strokeStyle=css('--accent');ctx.lineWidth=10;ctx.globalAlpha=0.45;ctx.stroke();ctx.globalAlpha=1}
+  var ink=css('--ink'),bg=css('--mapbg'),vis=[];
+  for(var hI=0;hI<hazards.length&&vis.length<=40;hI++){var hx=sx(hazards[hI].lng),hy=sy(my(hazards[hI].lat));if(hx>0&&hx<W&&hy>0&&hy<H)vis.push([hx,hy])}
+  if(vis.length<=40){ctx.lineWidth=1.5;ctx.strokeStyle=ink;ctx.fillStyle=bg;vis.forEach(function(v){ctx.beginPath();ctx.arc(v[0],v[1],3.5,0,7);ctx.fill();ctx.stroke()})}
+  ctx.font='500 12px Barlow, Arial, sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+  var placed=[];
+  roads.forEach(function(r){if(!r.label)return;var p=r.pts[Math.floor(r.pts.length/2)],x=sx(p[1]),y=sy(my(p[0]));if(x<30||x>W-30||y<12||y>H-12)return;
+    var w=ctx.measureText(r.name).width+8;
+    for(var k=0;k<placed.length;k++){if(Math.abs(placed[k][0]-x)<(placed[k][2]+w)/2+4&&Math.abs(placed[k][1]-y)<22)return}placed.push([x,y,w]);ctx.fillStyle=bg;ctx.globalAlpha=0.8;ctx.fillRect(x-w/2,y-9,w,18);ctx.globalAlpha=1;ctx.fillStyle=ink;ctx.fillText(r.name,x,y)});
+  [['A',trip.a],['B',trip.b]].forEach(function(m){if(m[1]<0||!graph)return;var x=sx(graph.nlng[m[1]]),y=sy(my(graph.nlat[m[1]]));
+    ctx.beginPath();ctx.arc(x,y,11,0,7);ctx.fillStyle=css('--accent');ctx.fill();ctx.strokeStyle=css('--surface');ctx.lineWidth=2;ctx.stroke();
+    ctx.fillStyle=css('--surface');ctx.font='600 13px Barlow, Arial, sans-serif';ctx.fillText(m[0],x,y+0.5)});
+  var cx=46,cy=46,R=30;ctx.beginPath();ctx.arc(cx,cy,R,0,7);ctx.fillStyle=css('--surface');ctx.fill();ctx.strokeStyle=css('--line');ctx.lineWidth=1;ctx.stroke();
+  ctx.fillStyle=css('--muted');ctx.font='600 11px Barlow, Arial, sans-serif';ctx.fillText('N',cx,cy-R+9);
+  if(sun.alt>-0.83){var a=sun.az*RAD,rr=R*(1-Math.min(Math.max(sun.alt,0),90)/90)*0.82;var px=cx+Math.sin(a)*rr,py=cy-Math.cos(a)*rr;
+    ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(px,py);ctx.strokeStyle=css('--low');ctx.lineWidth=2;ctx.stroke();
+    ctx.beginPath();ctx.arc(px,py,5.5,0,7);ctx.fillStyle=css('--low');ctx.fill();ctx.strokeStyle=ink;ctx.lineWidth=1;ctx.stroke()}
+  else{ctx.fillStyle=css('--muted');ctx.font='500 10px Barlow, Arial, sans-serif';ctx.fillText('sun down',cx,cy+3)}
+}
+function resize(){var r=cv.getBoundingClientRect();dpr=window.devicePixelRatio||1;var first=!W;W=r.width;H=r.height;cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);if(first)fit();draw()}
+function zoomAt(f,x,y){var mx=(x-W/2)/view.k+view.cx,myy=(y-H/2)/view.k+view.cy;view.k*=f;view.cx=mx-(x-W/2)/view.k;view.cy=myy-(y-H/2)/view.k;draw()}
+function nearestNode(x,y){var best=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var dx=sx(graph.nlng[i])-x,dy=sy(my(graph.nlat[i]))-y,d=dx*dx+dy*dy;if(d<bd){bd=d;best=i}}return best}
+function setPick(m){pickMode=m;el('btnA').classList.toggle('on',m==='a');el('btnB').classList.toggle('on',m==='b');
+  el('tripHint').textContent=m?'Now tap the map where the trip '+(m==='a'?'starts':'ends')+'.':'Or pick on the map: tap Start, then tap the map. Do the same for End.';
+  if(m)document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})}
+function solveTrip(){trip.path=(trip.a>=0&&trip.b>=0&&trip.a!==trip.b)?shortest(graph,trip.a,trip.b):null;showTrip();draw()}
+function showTrip(){
+  var o=el('tripOut');
+  el('btnA').textContent=trip.a>=0?'Start (A) set':'Start (A)';el('btnB').textContent=trip.b>=0?'End (B) set':'End (B)';
+  if(trip.a<0||trip.b<0){o.innerHTML='';return}
+  if(!trip.path){o.innerHTML='<p class="small">No path joins A and B on the loaded roads. Move one of them onto a connected road.</p>';return}
+  var p=dateParts(),min=+el('time').value,dep=zoned(p[0],p[1],p[2],min),r=tripCalc(trip.path,segs,roads,dep,center.lat,center.lng);
+  var offs=[-30,-15,0,15,30],res=offs.map(function(d){var m=min+d;return m<0||m>1435?null:{m:m,gl:tripCalc(trip.path,segs,roads,zoned(p[0],p[1],p[2],m),center.lat,center.lng).gl}}).filter(Boolean);
+  var best=res.reduce(function(x,y){return y.gl<x.gl?y:x});
+  var h='<p class="big">'+(r.gl<0.5?'No sun in your eyes on this trip':Math.round(r.gl)+' min with the sun in your eyes')+'</p>';
+  h+='<p class="small" style="margin-top:2px">'+r.km.toFixed(1)+' km, about '+Math.round(r.min)+' min, leaving '+clock(dep)+'.</p>';
+  if(best.gl<r.gl-1)h+='<button type="button" class="primary" data-m="'+best.m+'" style="margin-top:10px;width:100%">Leave at '+hm(best.m)+' instead: '+Math.round(best.gl)+' min</button>';
+  h+='<details><summary>Other leaving times and where it happens</summary><div class="cmp">'+res.map(function(x){return '<button type="button" data-m="'+x.m+'"'+(x===best?' class="best"':'')+'>'+hm(x.m)+': '+Math.round(x.gl)+' min</button>'}).join('')+'</div>';
+  if(r.st.length)h+='<ul class="list">'+r.st.map(function(s){return '<li><span>'+(s.name||'Unnamed road')+', driving '+s.d+'<br><span class="small">'+clock(s.t0)+' to '+clock(s.t1)+', '+s.km.toFixed(1)+' km</span></span><span class="pill '+(s.l===3?'high':'med')+'">'+(s.l===3?'Strong':'A little')+'</span></li>'}).join('')+'</ul>';
+  h+='</details>';
+  o.innerHTML=h;
+}
+function pick(x,y){
+  if(pickMode){var n=nearestNode(x,y);if(n>=0){if(pickMode==='a')trip.a=n;else trip.b=n;setPick(pickMode==='a'&&trip.b<0?'b':null);solveTrip()}return}
+  var best=-1,bd=18*18;for(var i=0;i<segs.length;i++){var s=segs[i],x1=sx(s.ax),y1=sy(s.ay),x2=sx(s.bx),y2=sy(s.by),dx=x2-x1,dy=y2-y1,L=dx*dx+dy*dy;
+    var t=L?Math.max(0,Math.min(1,((x-x1)*dx+(y-y1)*dy)/L)):0,ex=x1+t*dx-x,ey=y1+t*dy-y,d=ex*ex+ey*ey;if(d<bd){bd=d;best=i}}
+  selected=best;showSel();draw()}
+var pts=new Map(),moved=0,pd=0;
+function pos(e){var r=cv.getBoundingClientRect();return {x:e.clientX-r.left,y:e.clientY-r.top}}
+cv.addEventListener('pointerdown',function(e){cv.setPointerCapture(e.pointerId);pts.set(e.pointerId,pos(e));if(pts.size===1)moved=0;if(pts.size===2){var a=Array.from(pts.values());pd=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);moved=99}});
+cv.addEventListener('pointermove',function(e){if(!pts.has(e.pointerId))return;var p=pos(e),o=pts.get(e.pointerId);
+  if(pts.size===1){view.cx-=(p.x-o.x)/view.k;view.cy-=(p.y-o.y)/view.k;moved+=Math.abs(p.x-o.x)+Math.abs(p.y-o.y);pts.set(e.pointerId,p);draw()}
+  else{pts.set(e.pointerId,p);var a=Array.from(pts.values()),d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pd>0&&d>0)zoomAt(d/pd,(a[0].x+a[1].x)/2,(a[0].y+a[1].y)/2);pd=d}});
+function up(e){if(!pts.has(e.pointerId))return;var p=pts.get(e.pointerId),one=pts.size===1;pts.delete(e.pointerId);if(one&&moved<8)pick(p.x,p.y)}
+cv.addEventListener('pointerup',up);cv.addEventListener('pointercancel',function(e){pts.delete(e.pointerId)});
+cv.addEventListener('wheel',function(e){e.preventDefault();var p=pos(e);zoomAt(e.deltaY<0?1.2:1/1.2,p.x,p.y)},{passive:false});
+el('zin').onclick=function(){zoomAt(1.4,W/2,H/2)};el('zout').onclick=function(){zoomAt(1/1.4,W/2,H/2)};
+el('time').addEventListener('input',update);
+el('date').addEventListener('change',function(){if(!el('date').value)return;buildDay();update()});
+function setTime(m){el('time').value=Math.max(0,Math.min(1435,Math.round(m/5)*5));update()}
+el('btnNow').onclick=function(){var o={};fmt.formatToParts(new Date()).forEach(function(p){o[p.type]=+p.value});el('date').value=o.year+'-'+(o.month<10?'0':'')+o.month+'-'+(o.day<10?'0':'')+o.day;buildDay();setTime(o.hour*60+o.minute)};
+el('btnAm').onclick=function(){if(riseMin!==null)setTime(riseMin+35)};
+el('btnPm').onclick=function(){if(setMin!==null)setTime(setMin-40)};
+el('btnPlay').onclick=function(){
+  if(playing){clearInterval(playing);playing=null;el('btnPlay').textContent='\u25B6';return}
+  var start=riseMin===null?0:Math.max(0,riseMin-10),end=setMin===null?1435:Math.min(1435,setMin+10);
+  if(+el('time').value>=end||+el('time').value<start)setTime(start);
+  el('btnPlay').textContent='\u275A\u275A';
+  playing=setInterval(function(){var t=+el('time').value+5;if(t>end){clearInterval(playing);playing=null;el('btnPlay').textContent='\u25B6';return}setTime(t)},110);
+};
+function fromOverpass(j){var out=[],hz=[];(j.elements||[]).forEach(function(w){var t=w.tags||{};
+  if(w.type==='node'&&(t.highway==='traffic_signals'||t.highway==='crossing')){hz.push({lat:w.lat,lng:w.lon,type:t.highway==='crossing'?'crossing':'signal'});return}
+  if(t.amenity==='school'){var c=w.center||w;if(c.lat!==undefined)hz.push({lat:c.lat,lng:c.lon,type:'school'});return}
+  if(w.type!=='way'||!w.geometry||!t.highway)return;
+  out.push({name:t.name||t.ref||'',kmh:KMH[t.highway]||35,oneway:t.oneway==='yes'||t.junction==='roundabout'||(t.highway==='motorway'&&t.oneway!=='no'),pts:w.geometry.map(function(g){return [g.lat,g.lon]})})});return {roads:out,hazards:hz}}
+function fromGeo(j){var out=[],hz=[];(j.features||[]).forEach(function(f){var g=f.geometry,p=f.properties||{};if(!g)return;
+  if(g.type==='Point'){var ty=p.highway==='traffic_signals'?'signal':p.highway==='crossing'?'crossing':p.amenity==='school'?'school':null;if(ty)hz.push({lat:g.coordinates[1],lng:g.coordinates[0],type:ty});return}
+  var lines=g.type==='LineString'?[g.coordinates]:g.type==='MultiLineString'?g.coordinates:[];
+  lines.forEach(function(c){out.push({name:p.name||p.ref||'',kmh:KMH[p.highway]||35,oneway:p.oneway==='yes',pts:c.map(function(q){return [q[1],q[0]]})})})});return {roads:out,hazards:hz}}
+function say(t){el('msg').textContent=t}
+el('file').addEventListener('change',function(){var f=el('file').files[0];if(!f)return;var rd=new FileReader();
+  rd.onload=function(){try{var j=JSON.parse(rd.result),d=j.elements?fromOverpass(j):fromGeo(j),list=d.roads;
+      if(!list.length){say('That file has no road lines. Use an OpenStreetMap Overpass JSON export or a GeoJSON file of lines.');return}
+      setRoads(list,d.hazards,'Showing '+list.length+' roads and '+d.hazards.length+' signals, crossings and schools from your file, '+f.name+'.');say('')}
+    catch(err){say('That file could not be read as JSON. Export it again as GeoJSON or Overpass JSON.')}};
+  rd.readAsText(f)});
+el('btnReset').onclick=function(){setRoads(BN.roads,BN.hazards,BUILT);demoTrip();say('')};
+function liveLoad(s,w,n,e){
+  var span=Math.max(e-w,n-s);
+  var cls=span>0.3?'motorway|trunk|primary|secondary':span>0.08?'motorway|trunk|primary|secondary|tertiary':'motorway|trunk|primary|secondary|tertiary|unclassified|residential';
+  var bb='('+s.toFixed(4)+','+w.toFixed(4)+','+n.toFixed(4)+','+e.toFixed(4)+')';
+  var q='[out:json][timeout:40];(way[highway~"^('+cls+')$"]'+bb+';node[highway~"^(traffic_signals|crossing)$"]'+bb+';);out geom;nwr[amenity=school]'+bb+';out center;';
+  return fetch('https://overpass-api.de/api/interpreter?data='+encodeURIComponent(q)).then(function(r){if(!r.ok)throw new Error('busy');return r.json()}).then(function(j){var d=fromOverpass(j);d.span=span;return d});
+}
+el('btnLive').onclick=function(){
+  var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
+  var n=inv(view.cy-H/2/view.k),s=inv(view.cy+H/2/view.k);
+  say('Loading roads from OpenStreetMap…');
+  liveLoad(s,w,n,e).then(function(d){var list=d.roads;if(!list.length){say('No roads came back for this view. Zoom out a little and try again.');return}
+     var keep={cx:view.cx,cy:view.cy,k:view.k};setRoads(list,d.hazards,'Showing '+list.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for the view you chose'+(d.span>0.08?' (main roads only; zoom in for side streets).':'.'));view=keep;draw();say('')})
+   .catch(function(){say('Live loading did not work. Claude pages block outside data, so open the downloaded file in a browser, or use Load a road file. If you are already in a browser, the map server may be busy; try again in a minute.')});
+};
+function geocode(q){
+  var w=view.cx-W/2/view.k,e=view.cx+W/2/view.k,inv=function(y){return (2*Math.atan(Math.exp(-y*RAD))-Math.PI/2)/RAD};
+  var url='https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q)+'&viewbox='+[w,inv(view.cy-H/2/view.k),e,inv(view.cy+H/2/view.k)].map(function(v){return v.toFixed(3)}).join(',');
+  return fetch(url).then(function(r){if(!r.ok)throw new Error('lookup');return r.json()}).then(function(j){if(!j.length)throw new Error('notfound:'+q);return {lat:+j[0].lat,lng:+j[0].lon}});
+}
+function wait(ms){return new Promise(function(ok){setTimeout(ok,ms)})}
+function hint(t){el('tripHint').textContent=t}
+el('tripForm').addEventListener('submit',function(ev){
+  ev.preventDefault();var f=el('fromTxt').value.trim(),t=el('toTxt').value.trim();
+  if(!f||!t){hint('Type both a From address and a To address.');return}
+  hint('Finding the two addresses…');el('btnGo').disabled=true;var A,B;
+  geocode(f).then(function(a){A=a;return wait(1100)}).then(function(){return geocode(t)}).then(function(b){B=b;
+    var s=Math.min(A.lat,B.lat),n=Math.max(A.lat,B.lat),w=Math.min(A.lng,B.lng),e=Math.max(A.lng,B.lng),my_=Math.max(0.01,(n-s)*0.2),mx_=Math.max(0.013,(e-w)*0.2);
+    hint('Loading the roads between them…');
+    return liveLoad(s-my_,w-mx_,n+my_,e+mx_).then(function(d){if(d.roads.length)setRoads(d.roads,d.hazards,'Showing '+d.roads.length+' real roads and '+d.hazards.length+' signals, crossings and schools from OpenStreetMap for your trip'+(d.span>0.08?' (main roads only).':'.'))},function(){say('Real roads could not be loaded, so the trip uses the roads already on the map.')})})
+   .then(function(){trip.a=near(A.lat,A.lng);trip.b=near(B.lat,B.lng);setPick(null);solveTrip();hint(trip.path?'Trip found. Drag the time to change when you leave.':'The two addresses were found, but no road path joins them on this map.');
+     document.querySelector('.mapwrap').scrollIntoView({block:'center',behavior:'smooth'})})
+   .catch(function(err){var m=String(err&&err.message||'');
+     hint(m.indexOf('notfound:')===0?'Could not find "'+m.slice(9)+'". Add the city and state, then try again.':'Address lookup did not work. It is blocked inside Claude, so open index.html in a browser, or pick the points on the map.')})
+   .then(function(){el('btnGo').disabled=false});
+});
+var BUILT='Showing a built-in sketch of '+BUILTIN.length+' main St. Louis roads with '+BN.hazards.length+' junctions between them. Positions are approximate and drawn by hand, so use real roads for any real check.';
+function near(la,lo){var b=-1,bd=Infinity;for(var i=0;i<graph.nlat.length;i++){var d=distKm(la,lo,graph.nlat[i],graph.nlng[i]);if(d<bd){bd=d;b=i}}return b}
+function demoTrip(){trip.a=near(38.615,-90.2);trip.b=near(38.535,-90.49);solveTrip()}
+el('btnA').onclick=function(){setPick(pickMode==='a'?null:'a')};
+el('btnB').onclick=function(){setPick(pickMode==='b'?null:'b')};
+el('btnClear').onclick=function(){trip={a:-1,b:-1,path:null};setPick(null);el('btnA').textContent='Start (A)';el('btnB').textContent='End (B)';showTrip();draw()};
+el('tripOut').addEventListener('click',function(e){var b=e.target.closest('button[data-m]');if(b)setTime(+b.getAttribute('data-m'))});
+el('date').value=new Intl.DateTimeFormat('en-CA',{timeZone:TZ,year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+window.addEventListener('resize',resize);
+if(window.matchMedia)matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw);
+function stretches(){var out=[],cur=null,prev=-2;
+  for(var i=0;i<segs.length;i++){var s=segs[i];if(s.l<2){cur=null;continue}
+    if(cur&&prev===i-1&&cur.r===s.r&&cur.l===s.l&&cur.c[cur.c.length-1][0]===s.lo1&&cur.c[cur.c.length-1][1]===s.la1){cur.c.push([s.lo2,s.la2])}
+    else{cur={r:s.r,l:s.l,d:dirName(s.d),c:[[s.lo1,s.la1],[s.lo2,s.la2]]};out.push(cur)}prev=i}
+  return out}
+function when(){return el('date').value+' '+hm(+el('time').value)+' US Central'}
+function esc(t){return String(t).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function toKml(){var st=stretches();
+  return '<?xml version="1.0" encoding="UTF-8"?>\n<kml xmlns="http://www.opengis.net/kml/2.2"><Document><name>Sun glare, '+esc(when())+'</name>'
+   +'<Style id="strong"><LineStyle><color>ff2828d6</color><width>6</width></LineStyle></Style><Style id="some"><LineStyle><color>ff127df0</color><width>4</width></LineStyle></Style>'
+   +st.map(function(x){return '<Placemark><name>'+esc(roads[x.r].name||'Road')+'</name><description>'+(x.l===3?'Sun in your eyes':'A little sun in your eyes')+' driving '+x.d+'</description><styleUrl>#'+(x.l===3?'strong':'some')+'</styleUrl><LineString><tessellate>1</tessellate><coordinates>'+x.c.map(function(p){return p[0]+','+p[1]+',0'}).join(' ')+'</coordinates></LineString></Placemark>'}).join('')
+   +'</Document></kml>'}
+function toGeo(){return JSON.stringify({type:'FeatureCollection',name:'Sun glare, '+when(),features:stretches().map(function(x){return {type:'Feature',properties:{name:roads[x.r].name||'',level:x.l,heading:x.d},geometry:{type:'LineString',coordinates:x.c}}})})}
+function expSay(t){el('expMsg').textContent=t}
+function copyText(t,what){if(!stretches().length){expSay('No red or orange roads at this time, so there is nothing to copy.');return}
+  try{navigator.clipboard.writeText(t).then(function(){expSay(what+' copied. Paste it into a file or a map tool.')},function(){expSay('Copying was blocked here. Open this page in a browser and try again.')})}catch(e){expSay('Copying was blocked here. Open this page in a browser and try again.')}}
+el('btnCopyKml').onclick=function(){copyText(toKml(),'KML')};
+el('btnCopyGeo').onclick=function(){copyText(toGeo(),'GeoJSON')};
+el('btnKml').onclick=function(){if(!stretches().length){expSay('No red or orange roads at this time, so there is nothing to save.');return}
+  try{var a=document.createElement('a');a.href=URL.createObjectURL(new Blob([toKml()],{type:'application/vnd.google-earth.kml+xml'}));a.download='sun-glare.kml';document.body.appendChild(a);a.click();a.remove();
+    expSay('If no file appeared, saving is blocked here. Use Copy KML, or open this page in a browser.')}catch(e){expSay('Saving is blocked here. Use Copy KML, or open this page in a browser.')}};
+el('selClose').onclick=function(){selected=-1;showSel();draw()};
+new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:['data-theme']});
+if(document.fonts&&document.fonts.ready)document.fonts.ready.then(draw);
+resize();setRoads(BN.roads,BN.hazards,BUILT);
+if(setMin!==null)setTime(setMin-40);
+demoTrip();
+</script>
+</body>
+</html>
